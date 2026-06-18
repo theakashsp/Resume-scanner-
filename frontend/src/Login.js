@@ -23,7 +23,8 @@ function Login({ onLogin }) {
             <circle cx="12" cy="12" r="6"></circle>
             <circle cx="12" cy="12" r="2"></circle>
           </svg>
-          <h1 className="brand-title">PathFinder</h1>
+          <p className="brand-eyebrow">Resume</p>
+          <h1 className="brand-title hx-gradient-text">Analyzer</h1>
         </div>
         
         <p style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '800', letterSpacing: '0.1em', marginBottom: '35px' }}>

@@ -33,7 +33,7 @@ echo "[start] Frontend -> http://localhost:3000"
 FRONTEND_PID=$!
 
 echo ""
-echo "ResumeAIX is running (quick mode)."
+echo "Resume Analyzer is running (quick mode)."
 echo "  App:  http://localhost:3000"
 echo "  API:  http://127.0.0.1:8000/docs"
 echo "Press Ctrl+C to stop both servers."
