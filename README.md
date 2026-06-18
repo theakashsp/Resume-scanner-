@@ -1,105 +1,128 @@
-# 🚀 ResumeAIX: AI-Powered ATS Scanner & Job Matcher
+# Resume Analyzer
 
-Welcome to **ResumeAIX**, a full-stack AI web application built to help job seekers bridge the gap between academia and industry. By leveraging **Google Gemini LLM** and real-time job APIs, ResumeAIX instantly calculates an ATS match score, identifies critical skill gaps, and provides live, clickable job matches.
-
----
-
-## 🎯 Core Features
-
-| 🌟 Feature                 | 📝 Description                                               |
-| -------------------------- | ------------------------------------------------------------ |
-| 🔐 **User Authentication** | Secure JWT-based login and registration backed by MongoDB    |
-| 📄 **Smart PDF Parsing**   | Extracts unstructured text from resumes using `pdfminer.six` |
-| 🤖 **AI ATS Scoring**      | Uses Google Gemini 2.5 Flash as a virtual recruiter          |
-| 🌍 **Live Job Matches**    | Fetches real-time remote tech jobs via APIs                  |
-| 🎨 **3D Glassmorphic UI**  | Dark-mode UI with React Three Fiber animations               |
+**Resume Analyzer** is a full-stack career intelligence platform that scores resumes, extracts skills from real PDF content, maps realistic target roles, and surfaces live India job openings. Analysis is driven by the exact text extracted from each uploaded resume — not generic templates.
 
 ---
 
-## 🏗️ System Architecture
+## Core Features
+
+| Feature | Description |
+| --- | --- |
+| **ATS Scoring** | Domain-aware ATS score (0–100) calibrated to resume content |
+| **Dynamic Skill Extraction** | Skills pulled only from evidenced resume text; PII and contact noise filtered out |
+| **Realistic Role Matching** | Target roles matched to actual experience depth (fresher, non-IT, IT, cloud, commerce, etc.) |
+| **Skill Gap Analysis** | Missing competencies identified relative to the candidate's target role |
+| **Learning Roadmap** | Step-by-step milestones in the dashboard PDF report |
+| **Live Job Matches** | 4 India openings per recommended role via JSearch (RapidAPI) or Adzuna |
+| **PDF Career Report** | Branded export with profile, skills, roadmap, and clickable **Apply** links |
+| **Multi-Domain Support** | IT, Cloud & DevOps, Network, Commerce, Healthcare, Education, Management, and more |
+
+---
+
+## System Architecture
 
 ```text
-[ User / Job Seeker ]
-        │
-        ▼ (Uploads PDF & Clicks Analyze)
+[ User ]
+   │
+   ▼  Upload PDF resume
 
-┌───────────────────────────────┐
-│       React Frontend          │
-│  (3D UI, Dashboards, Routes)  │
-└─────────────▲─────────────────┘
-              │ (Response: ATS Score, Skills, Jobs)
-              ▼
-┌───────────────────────────────┐
-│       FastAPI Backend         │
-│   (Auth + Business Logic)     │
-└─────────────┬─────────────────┘
-              │
-     ┌────────┴────────┐
-     ▼                 ▼
-Google Gemini API   Remotive API
- (AI Analysis)      (Job Fetching)
+┌─────────────────────────────┐
+│   React Frontend            │
+│   Resume Analyzer UI        │
+│   Dashboard + PDF Export    │
+└──────────────▲──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│   FastAPI Backend           │
+│   PDF parse · AI analyze    │
+│   Job fetch · Stats API     │
+└──────────────┬──────────────┘
+               │
+      ┌────────┴────────┐
+      ▼                 ▼
+ Google Gemini      JSearch / Adzuna
+ (resume analysis)  (live India jobs)
 ```
 
 ---
 
-## 💻 Tech Stack
+## Tech Stack
 
-| 🔧 Layer            | 🛠️ Technologies                                         |
-| ------------------- | -------------------------------------------------------- |
-| **Frontend**        | React.js, React Router, Tailwind CSS, @react-three/fiber |
-| **Backend**         | Python, FastAPI, Uvicorn, Requests                       |
-| **Database & Auth** | MongoDB, PyMongo, JWT, Passlib, Bcrypt                   |
-| **AI & NLP**        | Google Gemini 2.5 Flash, pdfminer.six                    |
+| Layer | Technologies |
+| --- | --- |
+| **Frontend** | React, Axios, jsPDF, jspdf-autotable, lucide-react, react-dropzone |
+| **Backend** | Python, FastAPI, Uvicorn, Pydantic, Requests |
+| **PDF Parsing** | pdfminer.six, pypdf (multi-method extraction) |
+| **AI** | Google Gemini 2.5 Flash (`google-genai`) |
+| **Jobs** | JSearch via RapidAPI, Adzuna India API |
 
 ---
 
-## ⚙️ Local Setup & Installation
+## Quick Start
 
-### 🔹 1. Backend Setup
+From the project root:
+
+```bash
+# Windows (Git Bash)
+bash quick-start.sh
+
+# Windows (CMD)
+quick-start.bat
+```
+
+This will:
+
+1. Create the Python virtual environment (if needed)
+2. Install frontend dependencies (if needed)
+3. Build the frontend (first run only)
+4. Start the API on `http://127.0.0.1:8000`
+5. Serve the app on `http://localhost:3000`
+
+---
+
+## Manual Setup
+
+### 1. Backend
 
 ```bash
 cd backend
 python -m venv venv
-```
 
-Activate virtual environment:
-
-```bash
 # Windows
 venv\Scripts\activate
 
 # Mac/Linux
 source venv/bin/activate
+
+pip install -r requirements.txt
 ```
 
-Install dependencies:
+Copy the environment template and add your keys:
 
 ```bash
-pip install fastapi uvicorn python-multipart requests pdfminer.six pymongo google-generativeai passlib bcrypt pyjwt
+cp .env.example .env
 ```
 
-Create `backend/.env` (copy from `backend/.env.example`):
-
 ```env
-GEMINI_API_KEY=your_gemini_key
-RAPIDAPI_KEY=your_rapidapi_jsearch_key
+GEMINI_API_KEY=your_gemini_api_key
+RAPIDAPI_KEY=your_rapidapi_key
 RAPIDAPI_HOST=jsearch.p.rapidapi.com
-# or Adzuna India:
+
+# Optional — Adzuna India jobs
 ADZUNA_APP_ID=your_adzuna_app_id
 ADZUNA_APP_KEY=your_adzuna_app_key
 ```
 
-Run the backend server:
+> **Never commit `backend/.env`.** API keys stay local only.
+
+Start the API:
 
 ```bash
 python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Live jobs: after resume analysis, the dashboard shows **3–4 India jobs per recommended role** (JSearch and/or Adzuna). Without API keys, the job section still renders with a setup notice.
-
----
-
-### 🔹 2. Frontend Setup
+### 2. Frontend
 
 ```bash
 cd frontend
@@ -107,55 +130,99 @@ npm install
 npm start
 ```
 
----
+**Fast production mode** (pre-built bundle, ~5s startup):
 
-## 🔄 Workflow Summary
-
-1. User uploads resume (PDF)
-2. Backend extracts text using `pdfminer`
-3. Gemini AI analyzes resume
-4. ATS score + skill gaps generated
-5. Matching jobs fetched from API
-6. Results displayed in UI dashboard
+```bash
+npm run build:quick
+npm run start:quick
+```
 
 ---
 
-## 🚀 Deployment Tips
+## API Endpoints
 
-* Use **Render / Railway / AWS** for backend hosting
-* Deploy frontend via **Vercel / Netlify**
-* Store secrets using `.env` files
-* Enable HTTPS for secure JWT handling
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Service health and job provider status |
+| `GET` | `/api/platform-stats` | Analysis counts and platform metrics |
+| `GET` | `/api/features` | Feature list for the landing page |
+| `POST` | `/analyze` | Upload PDF resume (multipart field: `file`) |
+| `POST` | `/api/fetch-jobs` | Fetch live jobs for recommended roles |
 
----
-
-## 📌 Future Enhancements
-
-* 📊 Resume improvement score breakdown
-* 🧠 Personalized learning roadmap
-* 📈 Skill trend analytics
-* 📝 Cover letter generator
-* 🎯 Role-specific resume optimization
+Interactive docs: `http://127.0.0.1:8000/docs`
 
 ---
 
-## 🤝 Contributing
+## Analysis Workflow
 
-Contributions are welcome! Feel free to fork the repo and submit a pull request.
+1. User uploads a PDF resume
+2. Backend extracts text via pdfminer.six / pypdf
+3. Resume validity is checked (rejects non-resume documents)
+4. Gemini analyzes **only** the extracted resume text:
+   - `candidate_domain`
+   - `target_role` (realistic to experience depth)
+   - `current_skills` (explicitly stated in resume)
+   - `missing_skills` (gaps for the target role)
+   - `custom_roadmap` (step-by-step milestones)
+   - `ats_score`
+5. Live India jobs are fetched per recommended role
+6. Results appear on the dashboard; career roadmap and suggestions are included in the downloadable PDF
 
 ---
 
-## 📄 License
+## PDF Report
+
+The **Download Career Report** button generates a styled PDF including:
+
+- Candidate profile (name, email, phone, college)
+- ATS score with color-coded badge
+- Domain, target role, and recommended roles
+- Matched skills and skill gaps
+- Career suggestions and learning roadmap
+- Live job table with clickable **Apply** links
+
+---
+
+## Project Structure
+
+```text
+Resume-scanner--main/
+├── backend/
+│   ├── main.py              # FastAPI app, analyze route, job APIs
+│   ├── skills.py            # Domain profiles, skill extraction
+│   ├── pdf_parser.py        # Multi-method PDF text extraction
+│   ├── report_generator.py  # Server-side PDF helper
+│   ├── .env.example         # Environment template (no secrets)
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── App.js           # Main UI and dashboard
+│   │   ├── pdfReport.js     # Client-side PDF generator
+│   │   ├── TechBackground.js
+│   │   └── LiveJobOpenings.js
+│   └── package.json
+├── quick-start.sh
+├── quick-start.bat
+└── README.md
+```
+
+---
+
+## Deployment Tips
+
+- Host the backend on **Render**, **Railway**, or **AWS**
+- Deploy the frontend on **Vercel** or **Netlify**
+- Set environment variables in the hosting dashboard — do not commit `.env`
+- Point `REACT_APP_API_URL` to your deployed API URL for production builds
+
+---
+
+## License
 
 This project is licensed under the **MIT License**.
 
 ---
 
-## ⭐ Support
+## Support
 
-If you found this project useful, consider giving it a ⭐ on GitHub!
-
----
-git add README.md
-git commit -m "Finalized README with structured tables and formatting"
-git push origin main
+If this project helped you, consider giving it a star on GitHub.
