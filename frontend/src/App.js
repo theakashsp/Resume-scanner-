@@ -16,7 +16,6 @@ import {
   Zap,
 } from 'lucide-react';
 import LiveJobOpenings from './LiveJobOpenings';
-import TechBackground from './TechBackground';
 import { generateCareerReportPdf } from './pdfReport';
 import './App.css';
 
@@ -79,38 +78,39 @@ function useCountUp(target, duration = 1200) {
   return value;
 }
 
-function BrandName({ variant = 'hero' }) {
+function BrandName({ variant = 'header' }) {
   return (
     <div className={`ra-brand ra-brand--${variant}`}>
       <span className="ra-brand__resume">Resume</span>
-      <span className="ra-brand__analyzer hx-gradient-text">Analyzer</span>
+      <span className="ra-brand__analyzer">Analyzer</span>
     </div>
   );
 }
 
-function Header({ scrolled }) {
+function Navbar({ scrolled }) {
   const scrollTo = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
-    <header className={`hx-header hx-glass ${scrolled ? 'hx-header--scrolled' : ''}`}>
-      <div className="hx-header__inner">
-        <div className="hx-header__brand">
-          <div className="hx-header__logo">RA</div>
+    <nav className={`tw-navbar ${scrolled ? 'tw-navbar--scrolled' : ''}`}>
+      <div className="container tw-navbar__inner">
+        <div className="tw-brand">
+          <div className="tw-brand__icon">RA</div>
           <BrandName variant="header" />
         </div>
-        <nav className="hx-header__nav">
-          <a href="#features" onClick={(e) => { e.preventDefault(); scrollTo('features'); }}>Features</a>
-          <a href="#upload" onClick={(e) => { e.preventDefault(); scrollTo('upload'); }}>Upload</a>
+        <div className="tw-nav">
+          <a href="#home" onClick={(e) => { e.preventDefault(); scrollTo('home'); }}>Home</a>
+          <a href="#services" onClick={(e) => { e.preventDefault(); scrollTo('services'); }}>Services</a>
+          <a href="#upload" onClick={(e) => { e.preventDefault(); scrollTo('upload'); }}>Analyze</a>
           <a href="#process" onClick={(e) => { e.preventDefault(); scrollTo('process'); }}>Process</a>
-          <a href="#dashboard" onClick={(e) => { e.preventDefault(); scrollTo('dashboard'); }}>Results</a>
-        </nav>
-        <button type="button" className="hx-header__cta" onClick={() => scrollTo('upload')}>
+          <a href="#listings" onClick={(e) => { e.preventDefault(); scrollTo('listings'); }}>Listings</a>
+        </div>
+        <button type="button" className="btn btn-primary tw-btn-primary btn-sm" onClick={() => scrollTo('upload')}>
           Get Started
         </button>
       </div>
-    </header>
+    </nav>
   );
 }
 
@@ -122,76 +122,88 @@ function StatsBar({ stats }) {
 
   const items = [
     { value: analyses, label: 'Resumes Analyzed' },
-    { value: domains, label: 'Domains Supported' },
+    { value: domains, label: 'Career Domains' },
     { value: roles, label: 'Roles Per Scan' },
-    { value: jobsPerRole, label: 'Jobs Per Role' },
+    { value: jobsPerRole, label: 'Listings Per Role' },
   ];
 
   return (
-    <div className="hx-stats">
+    <div className="tw-stats">
       {items.map((item) => (
-        <article key={item.label} className="hx-stat hx-glass">
-          <div className="hx-stat__value">{item.value}{item.label === 'Jobs Per Role' ? '' : '+'}</div>
-          <div className="hx-stat__label">{item.label}</div>
+        <article key={item.label} className="tw-stat">
+          <div className="tw-stat__value">{item.value}{item.label === 'Listings Per Role' ? '' : '+'}</div>
+          <div className="tw-stat__label">{item.label}</div>
         </article>
       ))}
     </div>
   );
 }
 
-function FeaturesGrid({ features }) {
+function ServicesGrid({ features }) {
   return (
-    <section id="features">
-      <h2 className="hx-section-title hx-gradient-text">Platform Capabilities</h2>
-      <p className="hx-section-sub">Precision tools for candidates, campuses, and hiring readiness programs</p>
-      <div className="hx-features">
-        {(features || []).map((feat) => {
-          const Icon = FEATURE_ICONS[feat.icon] || Zap;
-          return (
-            <article key={feat.id} className="hx-feature hx-glass">
-              <div className="hx-feature__icon">
-                <Icon size={22} strokeWidth={2} />
+    <section id="services" className="tw-section tw-section--alt">
+      <div className="container">
+        <div className="tw-section-head text-center">
+          <span className="tw-section-label">Our Services</span>
+          <h2 className="tw-section-title">Professional Career Solutions</h2>
+          <p className="tw-section-sub">
+            Complete talent intelligence services — like a premium real estate agency, but for your career path
+          </p>
+        </div>
+        <div className="row g-4">
+          {(features || []).map((feat) => {
+            const Icon = FEATURE_ICONS[feat.icon] || Zap;
+            return (
+              <div key={feat.id} className="col-md-6 col-lg-4">
+                <article className="tw-service-card">
+                  <div className="tw-service-card__icon">
+                    <Icon size={24} strokeWidth={2} />
+                  </div>
+                  <h3>{feat.title}</h3>
+                  <p>{feat.description}</p>
+                </article>
               </div>
-              <h3>{feat.title}</h3>
-              <p>{feat.description}</p>
-            </article>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </section>
   );
 }
 
-function ProcessTimeline({ step }) {
+function ProcessSteps({ step }) {
   const steps = [
     { id: 1, label: 'Upload Resume', icon: Upload },
-    { id: 2, label: 'Deep Scan', icon: FileSearch },
-    { id: 3, label: 'Results & Report', icon: FileText },
+    { id: 2, label: 'AI Deep Scan', icon: FileSearch },
+    { id: 3, label: 'Career Report', icon: FileText },
   ];
   return (
-    <section className="hx-timeline hx-glass" id="process">
-      <h2 className="hx-section-title">How It Works</h2>
-      <p className="hx-section-sub">Three steps to your career intelligence dashboard</p>
-      <div className="hx-timeline__track">
-        {steps.map((s, index) => {
-          const Icon = s.icon;
-          const status = step > s.id ? 'done' : step === s.id ? 'active' : 'pending';
-          return (
-            <div key={s.id} className={`hx-timeline__step hx-timeline__step--${status}`}>
-              <div className="hx-timeline__node">
-                {status === 'done' ? <CheckCircle2 size={22} /> : <Icon size={22} />}
+    <section className="tw-section" id="process">
+      <div className="container">
+        <div className="tw-section-head text-center">
+          <span className="tw-section-label">How It Works</span>
+          <h2 className="tw-section-title">Your Career Journey in 3 Steps</h2>
+        </div>
+        <div className="tw-process">
+          {steps.map((s) => {
+            const Icon = s.icon;
+            const status = step > s.id ? 'done' : step === s.id ? 'active' : 'pending';
+            return (
+              <div key={s.id} className={`tw-process__step tw-process__step--${status}`}>
+                <div className="tw-process__node">
+                  {status === 'done' ? <CheckCircle2 size={24} /> : <Icon size={24} />}
+                </div>
+                <span className="tw-process__label">{s.label}</span>
               </div>
-              <span className="hx-timeline__label">{s.label}</span>
-              {index < steps.length - 1 && <div className="hx-timeline__connector" />}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </section>
   );
 }
 
-function HeroUpload({ file, setFile, loading, error, onAnalyze }) {
+function UploadSection({ file, setFile, loading, error, onAnalyze }) {
   const onDrop = useCallback((accepted) => {
     if (accepted?.[0]) setFile(accepted[0]);
   }, [setFile]);
@@ -205,52 +217,57 @@ function HeroUpload({ file, setFile, loading, error, onAnalyze }) {
   });
 
   return (
-    <div className="hx-upload hx-glass" id="upload">
-      <div
-        {...getRootProps()}
-        className={`hx-dropzone ${isDragActive ? 'hx-dropzone--active' : ''} ${file ? 'hx-dropzone--ready' : ''} ${loading ? 'hx-dropzone--disabled' : ''}`}
-      >
-        <input {...getInputProps()} />
-        <div className="hx-dropzone__icon">
-          <Upload size={32} strokeWidth={1.75} />
+    <section className="tw-section" id="upload">
+      <div className="container">
+        <div className="row justify-content-center">
+          <div className="col-lg-8">
+            <div className="tw-section-head text-center mb-4">
+              <span className="tw-section-label">Resume Analyzer</span>
+              <h2 className="tw-section-title">Upload Your Resume for Analysis</h2>
+              <p className="tw-section-sub">PDF format only — get ATS score, skills, gaps, and live job listings</p>
+            </div>
+            <div
+              {...getRootProps()}
+              className={`tw-upload-box ${isDragActive ? 'tw-upload-box--active' : ''} ${file ? 'tw-upload-box--ready' : ''} ${loading ? 'tw-upload-box--disabled' : ''}`}
+            >
+              <input {...getInputProps()} />
+              <div className="tw-upload-box__icon">
+                <Upload size={32} strokeWidth={1.75} />
+              </div>
+              {file ? (
+                <>
+                  <p className="tw-upload-box__title">{file.name}</p>
+                  <p className="tw-upload-box__meta">{(file.size / 1024).toFixed(1)} KB · ready for analysis</p>
+                </>
+              ) : (
+                <>
+                  <p className="tw-upload-box__title">
+                    {isDragActive ? 'Release to upload' : 'Drag & drop your resume PDF here'}
+                  </p>
+                  <p className="tw-upload-box__meta">or click to browse files</p>
+                </>
+              )}
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary tw-btn-primary w-100"
+              onClick={onAnalyze}
+              disabled={loading || !file}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="tw-loading__icon d-inline-block me-2" size={18} style={{ animation: 'tw-spin 0.9s linear infinite' }} />
+                  Analyzing Resume…
+                </>
+              ) : (
+                'Launch Career Analysis'
+              )}
+            </button>
+            {error && <div className="tw-alert" role="alert">{error}</div>}
+          </div>
         </div>
-        {file ? (
-          <>
-            <p className="hx-dropzone__title">{file.name}</p>
-            <p className="hx-dropzone__meta">{(file.size / 1024).toFixed(1)} KB · ready for analysis</p>
-          </>
-        ) : (
-          <>
-            <p className="hx-dropzone__title">
-              {isDragActive ? 'Release to upload your PDF' : 'Drag & drop your resume'}
-            </p>
-            <p className="hx-dropzone__meta">PDF only · click to browse</p>
-          </>
-        )}
       </div>
-
-      <button
-        type="button"
-        className="hx-btn hx-btn--primary"
-        onClick={onAnalyze}
-        disabled={loading || !file}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="hx-btn__spin" size={18} />
-            Analyzing Resume
-          </>
-        ) : (
-          'Launch Analysis'
-        )}
-      </button>
-
-      {error && (
-        <div className="hx-alert" role="alert">
-          {error}
-        </div>
-      )}
-    </div>
+    </section>
   );
 }
 
@@ -258,25 +275,37 @@ function AtsScoreRing({ score }) {
   const radius = 58;
   const circ = 2 * Math.PI * radius;
   const offset = circ - (score / 100) * circ;
-  const color = score >= 75 ? '#34d399' : score >= 50 ? '#fbbf24' : '#f87171';
+  const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
 
   return (
-    <div className="hx-score">
-      <svg viewBox="0 0 140 140" className="hx-score__svg">
-        <circle cx="70" cy="70" r={radius} className="hx-score__track" />
+    <div className="tw-score">
+      <svg viewBox="0 0 140 140" className="tw-score__svg">
+        <circle cx="70" cy="70" r={radius} className="tw-score__track" />
         <circle
           cx="70"
           cy="70"
           r={radius}
-          className="hx-score__fill"
+          className="tw-score__fill"
           style={{ strokeDasharray: circ, strokeDashoffset: offset, stroke: color }}
         />
       </svg>
-      <div className="hx-score__label">
-        <span className="hx-score__value" style={{ color }}>{score}</span>
-        <span className="hx-score__caption">ATS Score</span>
+      <div className="tw-score__label">
+        <span className="tw-score__value" style={{ color }}>{score}</span>
+        <span className="tw-score__caption">ATS Score</span>
       </div>
     </div>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="tw-footer">
+      <div className="container">
+        <div className="tw-footer__bottom">
+          © {new Date().getFullYear()} Resume Analyzer · Career Intelligence Platform
+        </div>
+      </div>
+    </footer>
   );
 }
 
@@ -387,138 +416,149 @@ function App() {
     });
   };
 
-  const loadingSteps = ['Parsing PDF', 'Extracting Skills', 'Matching Roles', 'Fetching Jobs'];
+  const loadingSteps = ['Parsing PDF', 'Extracting Skills', 'Matching Roles', 'Fetching Listings'];
 
   return (
-    <div className="hx-app">
-      <TechBackground />
-      <Header scrolled={scrolled} />
+    <div className="tw-app">
+      <Navbar scrolled={scrolled} />
 
-      <main className="hx-main">
-        <section className="hx-hero">
-          <div className="hx-hero__badge">
-            <span className="hx-hero__badge-dot" />
-            Professional Career Intelligence
-          </div>
-          <BrandName variant="hero" />
-          <p className="hx-hero__subtitle">
-            Enterprise-grade resume analysis powered by document-bound AI evaluation.
-            Receive ATS scoring, verified skill mapping, realistic role targeting, and curated live India job matches — with a polished PDF report ready to share.
+      <section className="tw-hero" id="home">
+        <div className="container">
+          <p className="tw-hero__breadcrumb">
+            Home <span>/</span> Career Agency <span>/</span> Resume Analyzer
           </p>
+          <BrandName variant="hero" />
+          <h1 className="tw-hero__title">
+            Find Your <em>Perfect Career Match</em>
+          </h1>
+          <p className="tw-hero__sub">
+            Resume Analyzer delivers premium resume analysis, ATS scoring, skill mapping,
+            and live India job listings — tailored exclusively from your uploaded resume.
+          </p>
+          <div className="tw-hero__actions">
+            <button type="button" className="btn btn-primary tw-btn-primary" onClick={() => document.getElementById('upload')?.scrollIntoView({ behavior: 'smooth' })}>
+              Analyze My Resume
+            </button>
+            <button type="button" className="btn tw-btn-outline" onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}>
+              Explore Services
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div className="container">
+        <div className="tw-hero-search">
           <StatsBar stats={platformStats} />
-          <FeaturesGrid features={features} />
-          <HeroUpload
-            file={file}
-            setFile={setFile}
-            loading={loading}
-            error={error}
-            onAnalyze={handleAnalyze}
-          />
-        </section>
+        </div>
+      </div>
 
-        <ProcessTimeline step={timelineStep} />
+      <ServicesGrid features={features} />
+      <UploadSection
+        file={file}
+        setFile={setFile}
+        loading={loading}
+        error={error}
+        onAnalyze={handleAnalyze}
+      />
+      <ProcessSteps step={timelineStep} />
 
-        {loading && (
-          <div className="hx-loading hx-glass" role="status" aria-live="polite">
-            <Loader2 className="hx-loading__icon" size={36} />
+      {loading && (
+        <div className="container">
+          <div className="tw-loading" role="status" aria-live="polite">
+            <Loader2 className="tw-loading__icon" size={36} />
             <p>Processing your resume…</p>
-            <div className="hx-loading__steps">
+            <div className="tw-loading__steps">
               {loadingSteps.map((label, i) => (
-                <span
-                  key={label}
-                  className={`hx-loading__step ${loadingStep >= i ? 'hx-loading__step--active' : ''}`}
-                >
+                <span key={label} className={`tw-loading__step ${loadingStep >= i ? 'tw-loading__step--active' : ''}`}>
                   {loadingStep > i ? '✓ ' : ''}{label}
                 </span>
               ))}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {results && (
-          <section className="hx-dashboard hx-glass" id="dashboard">
-            <div className="hx-dashboard__header">
-              <h2>Professional Analysis Report</h2>
-              <p>Every insight below is derived exclusively from your uploaded resume content.</p>
+      {results && (
+        <section className="tw-section tw-section--alt" id="dashboard">
+          <div className="container">
+            <div className="tw-section-head text-center mb-4">
+              <span className="tw-section-label">Analysis Report</span>
+              <h2 className="tw-section-title">Your Career Profile</h2>
+              <p className="tw-section-sub">Insights derived exclusively from your uploaded resume</p>
             </div>
 
-            <div className="hx-dashboard__meta">
-              {[
-                ['Name', candidateName],
-                ['Email', candidateEmail],
-                ['Phone', candidatePhone],
-                ['College', candidateCollege],
-                ['Domain', detectedDomain],
-                ['Predicted Role', role || 'N/A'],
-                ['Recommended Roles', recommendedRoles.length ? recommendedRoles.join(', ') : 'N/A'],
-              ].map(([label, val]) => (
-                <div key={label} className="hx-dashboard__meta-item">
-                  <strong>{label}</strong>
-                  {val}
+            <div className="tw-dashboard">
+              <div className="tw-dashboard__meta">
+                {[
+                  ['Candidate Name', candidateName],
+                  ['Email', candidateEmail],
+                  ['Phone', candidatePhone],
+                  ['College', candidateCollege],
+                  ['Domain', detectedDomain],
+                  ['Target Role', role || 'N/A'],
+                  ['Recommended Roles', recommendedRoles.length ? recommendedRoles.join(', ') : 'N/A'],
+                ].map(([label, val]) => (
+                  <div key={label} className="tw-dashboard__meta-item">
+                    <strong>{label}</strong>
+                    {val}
+                  </div>
+                ))}
+              </div>
+
+              <div className="tw-dashboard__grid">
+                <div className="tw-card tw-card--center">
+                  <AtsScoreRing score={results.ats_score ?? 0} />
+                  <p className="tw-card__hint">
+                    {results.ats_score >= 75
+                      ? 'Strong alignment for your target role.'
+                      : results.ats_score >= 50
+                      ? 'Solid foundation with room to close skill gaps.'
+                      : 'Prioritize missing keywords and clearer resume structure.'}
+                  </p>
                 </div>
-              ))}
-            </div>
 
-            <div className="hx-dashboard__grid">
-              <div className="hx-card hx-glass hx-card--center">
-                <AtsScoreRing score={results.ats_score ?? 0} />
-                <p className="hx-card__hint">
-                  {results.ats_score >= 75
-                    ? 'Strong alignment for your target role.'
-                    : results.ats_score >= 50
-                    ? 'Solid foundation with room to close skill gaps.'
-                    : 'Prioritize missing keywords and clearer resume structure.'}
+                <div className="tw-card">
+                  <h3>Matched Skills</h3>
+                  <ul className="tw-list">
+                    {matched.length > 0 ? matched.map((s, i) => <li key={i}>{s}</li>) : (
+                      <li className="tw-list__empty">No professional skills detected.</li>
+                    )}
+                  </ul>
+                  <h3 className="tw-card__subtitle">Skill Gaps</h3>
+                  <div className="tw-chips">
+                    {missing.length > 0 ? missing.map((s, i) => (
+                      <span className="tw-chip" key={i}>{s}</span>
+                    )) : (
+                      <span className="tw-list__empty">No major gaps detected.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-center mb-4">
+                <button type="button" className="btn btn-primary tw-btn-primary" onClick={generatePDFReport}>
+                  Download Career Report (PDF)
+                </button>
+                <p className="text-muted mt-2 small">
+                  Career suggestions and milestone roadmaps are included in the PDF report only.
                 </p>
               </div>
 
-              <div className="hx-card hx-glass">
-                <h3>Matched Skills</h3>
-                <ul className="hx-list">
-                  {matched.length > 0 ? matched.map((s, i) => <li key={i}>{s}</li>) : (
-                    <li className="hx-list__empty">No professional skills detected.</li>
-                  )}
-                </ul>
-
-                <h3 className="hx-card__subtitle">Skill Gaps</h3>
-                <div className="hx-chips">
-                  {missing.length > 0 ? missing.map((s, i) => (
-                    <span className="hx-chip" key={i}>{s}</span>
-                  )) : (
-                    <span className="hx-list__empty">No major gaps detected.</span>
-                  )}
-                </div>
+              <div id="listings">
+                <LiveJobOpenings
+                  recommendedRoles={recommendedRoles}
+                  jobsByRole={jobsByRole}
+                  jobsMessage={jobsMessage}
+                  jobsCount={jobsCount}
+                  loading={false}
+                />
               </div>
             </div>
+          </div>
+        </section>
+      )}
 
-            <div className="hx-dashboard__actions">
-              <button type="button" className="hx-btn hx-btn--primary" onClick={generatePDFReport}>
-                Download Career Report (PDF)
-              </button>
-              <p className="hx-dashboard__note">
-                Career suggestions and milestone roadmaps are included in the PDF report only.
-              </p>
-            </div>
-
-            <LiveJobOpenings
-              recommendedRoles={recommendedRoles}
-              jobsByRole={jobsByRole}
-              jobsMessage={jobsMessage}
-              jobsCount={jobsCount}
-              loading={false}
-            />
-          </section>
-        )}
-      </main>
-
-      <footer className="hx-footer hx-glass">
-        <BrandName variant="footer" />
-        <div className="hx-footer__links">
-          <a href="#features">Features</a>
-          <a href="#upload">Upload</a>
-          <a href="#process">Process</a>
-        </div>
-        <span>© {new Date().getFullYear()} Resume Analyzer · Confidential candidate insights</span>
-      </footer>
+      <Footer />
     </div>
   );
 }

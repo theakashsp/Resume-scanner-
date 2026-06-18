@@ -39,7 +39,7 @@ export default function TechBackground() {
           const dy = node.y - other.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < 140) {
-            const alpha = (1 - dist / 140) * 0.18;
+            const alpha = (1 - dist / 140) * 0.1;
             ctx.strokeStyle = `rgba(124, 58, 237, ${alpha})`;
             ctx.lineWidth = 0.6;
             ctx.beginPath();
@@ -49,7 +49,7 @@ export default function TechBackground() {
           }
         }
 
-        ctx.fillStyle = 'rgba(6, 182, 212, 0.55)';
+        ctx.fillStyle = 'rgba(8, 145, 178, 0.35)';
         ctx.beginPath();
         ctx.arc(node.x, node.y, node.r, 0, Math.PI * 2);
         ctx.fill();
