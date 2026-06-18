@@ -14,6 +14,8 @@ import {
   Shield,
   Route,
   Zap,
+  Mail,
+  Phone,
 } from 'lucide-react';
 import LiveJobOpenings from './LiveJobOpenings';
 import { generateCareerReportPdf } from './pdfReport';
@@ -298,9 +300,41 @@ function AtsScoreRing({ score }) {
 }
 
 function Footer() {
+  const scrollTo = (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <footer className="tw-footer">
       <div className="container">
+        <div className="row g-4">
+          <div className="col-lg-5">
+            <BrandName variant="footer" />
+            <p className="tw-footer__tag">Professional career intelligence — ATS scoring, skill mapping &amp; live India job listings</p>
+          </div>
+          <div className="col-6 col-lg-3">
+            <h5>Quick Links</h5>
+            <ul>
+              <li><a href="#home" onClick={(e) => { e.preventDefault(); scrollTo('home'); }}>Home</a></li>
+              <li><a href="#services" onClick={(e) => { e.preventDefault(); scrollTo('services'); }}>Services</a></li>
+              <li><a href="#upload" onClick={(e) => { e.preventDefault(); scrollTo('upload'); }}>Analyze</a></li>
+              <li><a href="#listings" onClick={(e) => { e.preventDefault(); scrollTo('listings'); }}>Listings</a></li>
+            </ul>
+          </div>
+          <div className="col-6 col-lg-4">
+            <h5>Contact</h5>
+            <ul>
+              <li>
+                <Mail size={14} className="me-1" />
+                <a href="mailto:spakash134@gmail.com">spakash134@gmail.com</a>
+              </li>
+              <li>
+                <Phone size={14} className="me-1" />
+                <a href="tel:+917483701130">+91 7483701130</a>
+              </li>
+            </ul>
+          </div>
+        </div>
         <div className="tw-footer__bottom">
           © {new Date().getFullYear()} Resume Analyzer · Career Intelligence Platform
         </div>
