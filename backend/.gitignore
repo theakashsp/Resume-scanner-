@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+venv/
+uploads/
+platform_stats.json
+__pycache__/
+*.pyc

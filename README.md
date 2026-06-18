@@ -114,7 +114,7 @@ ADZUNA_APP_ID=your_adzuna_app_id
 ADZUNA_APP_KEY=your_adzuna_app_key
 ```
 
-> **Never commit `backend/.env`.** API keys stay local only.
+> **Never commit `backend/.env`.** API keys stay local only. Copy `.env.example`, add your keys locally, and keep secrets out of version control.
 
 Start the API:
 

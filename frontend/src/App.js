@@ -142,8 +142,8 @@ function StatsBar({ stats }) {
 function FeaturesGrid({ features }) {
   return (
     <section id="features">
-      <h2 className="hx-section-title hx-gradient-text">Platform Features</h2>
-      <p className="hx-section-sub">Professional-grade career intelligence powered by modern technology</p>
+      <h2 className="hx-section-title hx-gradient-text">Platform Capabilities</h2>
+      <p className="hx-section-sub">Precision tools for candidates, campuses, and hiring readiness programs</p>
       <div className="hx-features">
         {(features || []).map((feat) => {
           const Icon = FEATURE_ICONS[feat.icon] || Zap;
@@ -398,12 +398,12 @@ function App() {
         <section className="hx-hero">
           <div className="hx-hero__badge">
             <span className="hx-hero__badge-dot" />
-            Career Intelligence Platform
+            Professional Career Intelligence
           </div>
           <BrandName variant="hero" />
           <p className="hx-hero__subtitle">
-            Upload your PDF resume for ATS scoring, precise skill extraction, and live India job matches.
-            Personalized career roadmaps are delivered exclusively in your downloadable report.
+            Enterprise-grade resume analysis powered by document-bound AI evaluation.
+            Receive ATS scoring, verified skill mapping, realistic role targeting, and curated live India job matches — with a polished PDF report ready to share.
           </p>
           <StatsBar stats={platformStats} />
           <FeaturesGrid features={features} />
@@ -438,8 +438,8 @@ function App() {
         {results && (
           <section className="hx-dashboard hx-glass" id="dashboard">
             <div className="hx-dashboard__header">
-              <h2>Analysis Results</h2>
-              <p>Your dashboard reflects the unique content extracted from your resume.</p>
+              <h2>Professional Analysis Report</h2>
+              <p>Every insight below is derived exclusively from your uploaded resume content.</p>
             </div>
 
             <div className="hx-dashboard__meta">
@@ -517,7 +517,7 @@ function App() {
           <a href="#upload">Upload</a>
           <a href="#process">Process</a>
         </div>
-        <span>© {new Date().getFullYear()} Resume Analyzer</span>
+        <span>© {new Date().getFullYear()} Resume Analyzer · Confidential candidate insights</span>
       </footer>
     </div>
   );

@@ -237,6 +237,13 @@ def jobs_provider_status() -> dict[str, Any]:
     }
 
 
+def ai_provider_status() -> dict[str, Any]:
+    return {
+        "gemini_configured": _genai_client is not None,
+        "analysis_mode": "gemini" if _genai_client is not None else "heuristic",
+    }
+
+
 def fetch_jsearch_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[dict[str, Any]]:
     if not _is_real_key(RAPIDAPI_KEY):
         return []
@@ -794,6 +801,7 @@ def platform_stats():
         "jobs_per_role": JOBS_PER_ROLE,
         "live_jobs_enabled": provider["any_provider"],
         "jobs_provider": provider,
+        "ai_provider": ai_provider_status(),
     }
 
 
@@ -807,8 +815,9 @@ def health():
     return {
         "status": "ok",
         "service": "Resume Analyzer",
-        "version": "4.0",
+        "version": "4.1",
         "jobs_provider": jobs_provider_status(),
+        "ai_provider": ai_provider_status(),
     }
 
 
