@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import sys
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -79,10 +80,33 @@ def _is_real_key(value: str | None) -> bool:
 
 
 _genai_client = (
-    genai.Client(api_key=GEMINI_API_KEY.strip())
+    genai.Client(
+        api_key=GEMINI_API_KEY.strip(),
+        http_options=types.HttpOptions(timeout=120_000),
+    )
     if _is_real_key(GEMINI_API_KEY)
     else None
 )
+
+_TRANSIENT_GEMINI_MARKERS = (
+    "ssl",
+    "eof",
+    "unexpected_eof",
+    "connecterror",
+    "connectionreset",
+    "remoteprotocolerror",
+    "server disconnected",
+    "timed out",
+    "timeout",
+    "temporarily unavailable",
+    "503",
+    "429",
+)
+
+
+def _is_transient_gemini_error(exc: BaseException) -> bool:
+    blob = f"{type(exc).__name__} {exc}".lower()
+    return any(marker in blob for marker in _TRANSIENT_GEMINI_MARKERS)
 
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -616,32 +640,40 @@ Return ONLY valid JSON matching this schema:
 {bounded_text}
 --- RESUME TEXT END ---"""
 
-    try:
-        response = _genai_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_json_schema=GEMINI_RESUME_SCHEMA,
-                temperature=0.1,
-            ),
-        )
-        cleaned = _strip_llm_json(response.text or "")
-        parsed = json.loads(cleaned)
-        mapped = _map_analysis_response(parsed, bounded_text)
-        if mapped.get("error"):
+    last_error: Exception | None = None
+    for attempt in range(1, 4):
+        try:
+            response = _genai_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_json_schema=GEMINI_RESUME_SCHEMA,
+                    temperature=0.1,
+                ),
+            )
+            cleaned = _strip_llm_json(response.text or "")
+            parsed = json.loads(cleaned)
+            mapped = _map_analysis_response(parsed, bounded_text)
+            if mapped.get("error"):
+                return mapped
+            mapped["_source"] = "gemini"
             return mapped
-        mapped["_source"] = "gemini"
-        return mapped
-    except HTTPException:
-        raise
-    except json.JSONDecodeError as e:
-        _log(f"[Gemini] JSONDecodeError: {e!r}")
-        raise HTTPException(status_code=502, detail="Gemini returned unparsable JSON.")
-    except Exception as e:
-        _log(f"[Gemini] {type(e).__name__}: {e!r}")
-        safe_detail = str(e).encode("ascii", "backslashreplace").decode("ascii")
-        raise HTTPException(status_code=502, detail=f"Gemini analysis failed: {safe_detail[:500]}")
+        except json.JSONDecodeError as e:
+            _log(f"[Gemini] JSONDecodeError: {e!r}")
+            raise HTTPException(status_code=502, detail="Gemini returned unparsable JSON.")
+        except Exception as e:
+            last_error = e
+            _log(f"[Gemini] attempt {attempt}/3 {type(e).__name__}: {e!r}")
+            if _is_transient_gemini_error(e) and attempt < 3:
+                time.sleep(1.5 * attempt)
+                continue
+            break
+
+    safe_detail = str(last_error or "unknown error").encode("ascii", "backslashreplace").decode("ascii")
+    if last_error is not None and _is_transient_gemini_error(last_error):
+        raise ConnectionError(f"Gemini transient failure: {safe_detail[:500]}")
+    raise HTTPException(status_code=502, detail=f"Gemini analysis failed: {safe_detail[:500]}")
 
 
 def analyze_resume(extracted_text: str) -> dict[str, Any]:
