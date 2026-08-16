@@ -2,6 +2,8 @@
 
 **Resume Analyzer** is a full-stack career intelligence platform that scores resumes, extracts skills from real PDF content, maps realistic target roles, and surfaces live India job openings. Analysis is driven by the exact text extracted from each uploaded resume — not generic templates.
 
+**Live app (local):** `http://localhost:3000` · **API docs:** `http://127.0.0.1:8000/docs`
+
 ---
 
 ## Core Features
@@ -16,6 +18,78 @@
 | **Live Job Matches** | 4 India openings per recommended role via JSearch (RapidAPI) or Adzuna |
 | **PDF Career Report** | Branded export with profile, skills, roadmap, and clickable **Apply** links |
 | **Multi-Domain Support** | IT, Cloud & DevOps, Network, Commerce, Healthcare, Education, Management, and more |
+
+---
+
+## What I Used
+
+Everything this project is built with — languages, libraries, APIs, and tooling.
+
+### Languages & runtimes
+
+| Item | Role |
+| --- | --- |
+| **Python 3.11+** | Backend API and resume analysis |
+| **JavaScript (ES6+)** | Frontend UI |
+| **HTML / CSS** | Layout and styling |
+| **JSON** | API payloads and Gemini structured output |
+
+### Frontend stack
+
+| Item | Role |
+| --- | --- |
+| **React 19** | UI framework (Create React App / `react-scripts`) |
+| **Axios** | HTTP client for analyze + stats APIs |
+| **react-dropzone** | PDF upload drag-and-drop |
+| **lucide-react** | Icons |
+| **jsPDF + jspdf-autotable** | Client-side career report PDF |
+| **Bootstrap 5.3** (CDN) | Layout grid and base components |
+| **DM Sans + Nunito** (Google Fonts) | Typography |
+| **serve** | Fast static hosting of the production build (`start:quick`) |
+| **cross-env** | Cross-platform build/start env flags |
+
+### Backend stack
+
+| Item | Role |
+| --- | --- |
+| **FastAPI** | REST API |
+| **Uvicorn** | ASGI server |
+| **Pydantic** | Request/response models |
+| **python-multipart** | PDF file uploads |
+| **python-dotenv** | Load `backend/.env` secrets |
+| **Requests** | JSearch / Adzuna HTTP calls |
+| **pdfminer.six** | Primary PDF text extraction |
+| **pypdf** | Fallback PDF text extraction |
+
+### AI & external APIs
+
+| Item | Role |
+| --- | --- |
+| **Google Gemini 2.5 Flash** (`google-genai`) | Resume analysis, ATS score, skills, gaps, roadmap |
+| **JSearch** via **RapidAPI** | Live India job listings (primary) |
+| **Adzuna India API** | Optional alternate job provider |
+
+### Dev & delivery tools
+
+| Item | Role |
+| --- | --- |
+| **Git + GitHub** | Version control and hosting |
+| **Node.js + npm** | Frontend package management |
+| **Python venv** | Isolated backend dependencies |
+| **quick-start.sh / .bat** | One-command local startup |
+| **Cursor** | Development environment |
+
+### Environment variables (local only)
+
+| Variable | Used for |
+| --- | --- |
+| `GEMINI_API_KEY` | Google Gemini analysis |
+| `RAPIDAPI_KEY` | JSearch jobs |
+| `RAPIDAPI_HOST` | RapidAPI host (`jsearch.p.rapidapi.com`) |
+| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | Optional Adzuna jobs |
+| `REACT_APP_API_URL` | Frontend → backend URL (production) |
+
+> **Never commit `backend/.env`.** Copy `.env.example`, add keys locally, keep secrets out of Git.
 
 ---
 
@@ -47,14 +121,14 @@
 
 ---
 
-## Tech Stack
+## Tech Stack (summary)
 
 | Layer | Technologies |
 | --- | --- |
-| **Frontend** | React, Axios, jsPDF, jspdf-autotable, lucide-react, react-dropzone |
-| **Backend** | Python, FastAPI, Uvicorn, Pydantic, Requests |
-| **PDF Parsing** | pdfminer.six, pypdf (multi-method extraction) |
-| **AI** | Google Gemini 2.5 Flash (`google-genai`) |
+| **Frontend** | React 19, Axios, jsPDF, lucide-react, react-dropzone, Bootstrap 5, Google Fonts |
+| **Backend** | Python, FastAPI, Uvicorn, Pydantic, Requests, python-dotenv |
+| **PDF Parsing** | pdfminer.six, pypdf |
+| **AI** | Google Gemini 2.5 Flash (`google-genai`) with retries + local fallback |
 | **Jobs** | JSearch via RapidAPI, Adzuna India API |
 
 ---
@@ -114,8 +188,6 @@ ADZUNA_APP_ID=your_adzuna_app_id
 ADZUNA_APP_KEY=your_adzuna_app_key
 ```
 
-> **Never commit `backend/.env`.** API keys stay local only. Copy `.env.example`, add your keys locally, and keep secrets out of version control.
-
 Start the API:
 
 ```bash
@@ -143,7 +215,7 @@ npm run start:quick
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| `GET` | `/health` | Service health and job provider status |
+| `GET` | `/health` | Service health, Gemini + job provider status |
 | `GET` | `/api/platform-stats` | Analysis counts and platform metrics |
 | `GET` | `/api/features` | Feature list for the landing page |
 | `POST` | `/analyze` | Upload PDF resume (multipart field: `file`) |
@@ -165,8 +237,9 @@ Interactive docs: `http://127.0.0.1:8000/docs`
    - `missing_skills` (gaps for the target role)
    - `custom_roadmap` (step-by-step milestones)
    - `ats_score`
-5. Live India jobs are fetched per recommended role
-6. Results appear on the dashboard; career roadmap and suggestions are included in the downloadable PDF
+5. Transient Gemini SSL/network errors are retried (up to 3 times); if still unavailable, local text analysis is used
+6. Live India jobs are fetched per recommended role
+7. Results appear on the dashboard; career roadmap and suggestions are included in the downloadable PDF
 
 ---
 
@@ -188,7 +261,7 @@ The **Download Career Report** button generates a styled PDF including:
 ```text
 Resume-scanner--main/
 ├── backend/
-│   ├── main.py              # FastAPI app, analyze route, job APIs
+│   ├── main.py              # FastAPI app, Gemini analysis, job APIs
 │   ├── skills.py            # Domain profiles, skill extraction
 │   ├── pdf_parser.py        # Multi-method PDF text extraction
 │   ├── report_generator.py  # Server-side PDF helper
@@ -196,10 +269,11 @@ Resume-scanner--main/
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── App.js           # Main UI and dashboard
+│   │   ├── App.js           # Main UI, navbar, footer, dashboard
+│   │   ├── App.css          # Agency-style light theme
 │   │   ├── pdfReport.js     # Client-side PDF generator
-│   │   ├── TechBackground.js
-│   │   └── LiveJobOpenings.js
+│   │   ├── LiveJobOpenings.js
+│   │   └── TechBackground.js
 │   └── package.json
 ├── quick-start.sh
 ├── quick-start.bat
@@ -225,4 +299,5 @@ This project is licensed under the **MIT License**.
 
 ## Support
 
-If this project helped you, consider giving it a star on GitHub.
+If this project helped you, consider giving it a star on GitHub:  
+https://github.com/theakashsp/Resume-scanner-
