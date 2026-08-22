@@ -29,7 +29,7 @@ def _log(msg: object) -> None:
 
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from google import genai
@@ -38,6 +38,7 @@ from pathlib import Path
 from pdf_parser import extract_pdf_text
 from pydantic import BaseModel, Field
 
+import auth_store
 from skills import (
     DOMAIN_PROFILES,
     _NON_RESUME_SIGNALS,
@@ -222,6 +223,21 @@ GEMINI_RESUME_SCHEMA = {
 
 class FetchJobsRequest(BaseModel):
     recommended_roles: list[str] = Field(default_factory=list)
+
+
+class RegisterRequest(BaseModel):
+    name: str = ""
+    phone: str = ""
+    password: str = ""
+
+
+class OtpRequest(BaseModel):
+    phone: str = ""
+
+
+class OtpVerifyRequest(BaseModel):
+    phone: str = ""
+    otp: str = ""
 
 
 def _normalize_resume_text(text: str) -> str:
@@ -840,6 +856,52 @@ def platform_stats():
 @app.get("/api/features")
 def platform_features():
     return {"features": PLATFORM_FEATURES}
+
+
+@app.post("/api/auth/register")
+def auth_register(body: RegisterRequest):
+    try:
+        user = auth_store.register_user(body.name, body.phone, body.password)
+        return {"ok": True, "message": "Registered successfully. Sign in with phone OTP.", "user": user}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/api/auth/otp/request")
+def auth_otp_request(body: OtpRequest):
+    try:
+        return {"ok": True, **auth_store.request_otp(body.phone)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/api/auth/otp/verify")
+def auth_otp_verify(body: OtpVerifyRequest):
+    try:
+        result = auth_store.verify_otp(body.phone, body.otp)
+        return {"ok": True, "message": "Signed in successfully.", **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.get("/api/auth/me")
+def auth_me(authorization: str | None = Header(default=None)):
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    user = auth_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not signed in.")
+    return {"ok": True, "user": user}
+
+
+@app.post("/api/auth/logout")
+def auth_logout(authorization: str | None = Header(default=None)):
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    auth_store.logout(token)
+    return {"ok": True, "message": "Signed out."}
 
 
 @app.get("/health")

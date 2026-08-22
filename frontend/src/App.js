@@ -16,10 +16,17 @@ import {
   Zap,
   Mail,
   Phone,
+  UserPlus,
+  LogIn,
+  LogOut,
+  User,
 } from 'lucide-react';
 import LiveJobOpenings from './LiveJobOpenings';
+import AuthModal from './AuthModal';
 import { generateCareerReportPdf } from './pdfReport';
 import './App.css';
+
+const AUTH_STORAGE_KEY = 'ra_auth';
 
 const FEATURE_ICONS = {
   target: Target,
@@ -89,7 +96,7 @@ function BrandName({ variant = 'header' }) {
   );
 }
 
-function Navbar({ scrolled }) {
+function Navbar({ scrolled, user, onOpenAuth, onLogout }) {
   const scrollTo = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -108,9 +115,34 @@ function Navbar({ scrolled }) {
           <a href="#process" onClick={(e) => { e.preventDefault(); scrollTo('process'); }}>Process</a>
           <a href="#listings" onClick={(e) => { e.preventDefault(); scrollTo('listings'); }}>Listings</a>
         </div>
-        <button type="button" className="btn btn-primary tw-btn-primary btn-sm" onClick={() => scrollTo('upload')}>
-          Get Started
-        </button>
+        <div className="tw-navbar__actions">
+          {user ? (
+            <>
+              <span className="tw-navbar__user" title={user.phone}>
+                <User size={16} />
+                {user.name}
+              </span>
+              <button type="button" className="tw-nav-icon-btn" onClick={onLogout} title="Sign out" aria-label="Sign out">
+                <LogOut size={18} />
+                <span>Sign out</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="tw-nav-icon-btn" onClick={() => onOpenAuth('register')} title="Register" aria-label="Register">
+                <UserPlus size={18} />
+                <span>Register</span>
+              </button>
+              <button type="button" className="tw-nav-icon-btn" onClick={() => onOpenAuth('signin')} title="Sign in" aria-label="Sign in">
+                <LogIn size={18} />
+                <span>Sign in</span>
+              </button>
+            </>
+          )}
+          <button type="button" className="btn btn-primary tw-btn-primary btn-sm" onClick={() => scrollTo('upload')}>
+            Get Started
+          </button>
+        </div>
       </div>
     </nav>
   );
@@ -352,6 +384,9 @@ function App() {
   const [features, setFeatures] = useState([]);
   const [scrolled, setScrolled] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
+  const [authModal, setAuthModal] = useState(null);
+  const [authUser, setAuthUser] = useState(null);
+  const [authToken, setAuthToken] = useState(null);
 
   const timelineStep = useMemo(() => {
     if (results) return 3;
@@ -359,6 +394,38 @@ function App() {
     if (file) return 2;
     return 1;
   }, [file, loading, results]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved?.token && saved?.user) {
+        setAuthToken(saved.token);
+        setAuthUser(saved.user);
+        axios
+          .get(`${getApiOrigin()}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${saved.token}` },
+          })
+          .then((r) => {
+            if (r.data?.user) {
+              setAuthUser(r.data.user);
+              localStorage.setItem(
+                AUTH_STORAGE_KEY,
+                JSON.stringify({ token: saved.token, user: r.data.user }),
+              );
+            }
+          })
+          .catch(() => {
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+            setAuthToken(null);
+            setAuthUser(null);
+          });
+      }
+    } catch {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     const api = getApiOrigin();
@@ -385,6 +452,28 @@ function App() {
     return () => timers.forEach(clearTimeout);
   }, [loading]);
 
+  const handleAuthSuccess = ({ token, user }) => {
+    setAuthToken(token);
+    setAuthUser(user);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, user }));
+  };
+
+  const handleLogout = async () => {
+    try {
+      if (authToken) {
+        await axios.post(
+          `${getApiOrigin()}/api/auth/logout`,
+          {},
+          { headers: { Authorization: `Bearer ${authToken}` } },
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    setAuthToken(null);
+    setAuthUser(null);
+  };
   const handleAnalyze = async () => {
     if (!file) return;
     setLoading(true);
@@ -454,7 +543,19 @@ function App() {
 
   return (
     <div className="tw-app">
-      <Navbar scrolled={scrolled} />
+      <Navbar
+        scrolled={scrolled}
+        user={authUser}
+        onOpenAuth={(mode) => setAuthModal(mode)}
+        onLogout={handleLogout}
+      />
+      {authModal && (
+        <AuthModal
+          mode={authModal}
+          onClose={() => setAuthModal(null)}
+          onAuthSuccess={handleAuthSuccess}
+        />
+      )}
 
       <section className="tw-hero" id="home">
         <div className="container">
