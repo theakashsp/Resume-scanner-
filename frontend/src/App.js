@@ -180,10 +180,10 @@ function ProcessSteps({ step }) {
     { id: 3, label: 'Career Report', icon: FileText },
   ];
   return (
-    <section className="tw-section" id="process">
+    <section className="tw-section tw-section--after-upload" id="process">
       <div className="container">
         <div className="tw-section-head text-center">
-          <span className="tw-section-label">How It Works</span>
+          <span className="tw-section-label">Process</span>
           <h2 className="tw-section-title">Your Career Journey in 3 Steps</h2>
         </div>
         <div className="tw-process">
@@ -219,7 +219,7 @@ function UploadSection({ file, setFile, loading, error, onAnalyze }) {
   });
 
   return (
-    <section className="tw-section" id="upload">
+    <section className="tw-section tw-section--upload" id="upload">
       <div className="container">
         <div className="row justify-content-center">
           <div className="col-lg-8">
