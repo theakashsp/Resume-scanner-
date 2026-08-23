@@ -22,7 +22,8 @@ import {
   User,
 } from 'lucide-react';
 import LiveJobOpenings from './LiveJobOpenings';
-import AuthModal from './AuthModal';
+import SignInPage from './SignInPage';
+import RegisterPage from './RegisterPage';
 import { generateCareerReportPdf } from './pdfReport';
 import './App.css';
 
@@ -96,15 +97,18 @@ function BrandName({ variant = 'header' }) {
   );
 }
 
-function Navbar({ scrolled, user, onOpenAuth, onLogout }) {
+function Navbar({ scrolled, user, onOpenAuth, onLogout, onGoHome }) {
   const scrollTo = (id) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    onGoHome?.();
+    setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
   };
 
   return (
     <nav className={`tw-navbar ${scrolled ? 'tw-navbar--scrolled' : ''}`}>
       <div className="container tw-navbar__inner">
-        <div className="tw-brand">
+        <div className="tw-brand" role="button" tabIndex={0} onClick={onGoHome} onKeyDown={(e) => e.key === 'Enter' && onGoHome?.()} style={{ cursor: 'pointer' }}>
           <div className="tw-brand__icon">RA</div>
           <BrandName variant="header" />
         </div>
@@ -384,7 +388,7 @@ function App() {
   const [features, setFeatures] = useState([]);
   const [scrolled, setScrolled] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
-  const [authModal, setAuthModal] = useState(null);
+  const [authPage, setAuthPage] = useState(null);
   const [authUser, setAuthUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
 
@@ -456,6 +460,8 @@ function App() {
     setAuthToken(token);
     setAuthUser(user);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, user }));
+    setAuthPage(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleLogout = async () => {
@@ -546,17 +552,28 @@ function App() {
       <Navbar
         scrolled={scrolled}
         user={authUser}
-        onOpenAuth={(mode) => setAuthModal(mode)}
+        onOpenAuth={(mode) => setAuthPage(mode)}
         onLogout={handleLogout}
+        onGoHome={() => setAuthPage(null)}
       />
-      {authModal && (
-        <AuthModal
-          mode={authModal}
-          onClose={() => setAuthModal(null)}
+
+      {authPage === 'signin' && (
+        <SignInPage
           onAuthSuccess={handleAuthSuccess}
+          onGoRegister={() => setAuthPage('register')}
+          onGoHome={() => setAuthPage(null)}
         />
       )}
 
+      {authPage === 'register' && (
+        <RegisterPage
+          onGoSignIn={() => setAuthPage('signin')}
+          onGoHome={() => setAuthPage(null)}
+        />
+      )}
+
+      {!authPage && (
+        <>
       <section className="tw-hero" id="home">
         <div className="container">
           <p className="tw-hero__breadcrumb">
@@ -694,6 +711,8 @@ function App() {
       )}
 
       <Footer />
+        </>
+      )}
     </div>
   );
 }
