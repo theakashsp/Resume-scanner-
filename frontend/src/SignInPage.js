@@ -1,47 +1,39 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { LogIn, Phone, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { formatAuthError, getApiOrigin } from './authUtils';
 
 export default function SignInPage({ onAuthSuccess, onGoRegister, onGoHome }) {
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [demoOtp, setDemoOtp] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
   const api = getApiOrigin();
 
-  const handleRequestOtp = async (e) => {
+  const handleSignIn = async (e) => {
     e.preventDefault();
     setError('');
     setInfo('');
-    setLoading(true);
-    try {
-      const { data } = await axios.post(`${api}/api/auth/otp/request`, {
-        phone: phone.trim(),
-      });
-      setOtpSent(true);
-      setDemoOtp(data.demo_otp || '');
-      setInfo(data.message || 'OTP sent. Enter the 6-digit code.');
-    } catch (err) {
-      setError(formatAuthError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setError('');
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const { data } = await axios.post(`${api}/api/auth/otp/verify`, {
-        phone: phone.trim(),
-        otp: otp.trim(),
+      const { data } = await axios.post(`${api}/api/auth/login`, {
+        email: email.trim(),
+        password,
       });
+      setInfo('Signed in successfully! Redirecting…');
       onAuthSuccess?.({ token: data.token, user: data.user });
     } catch (err) {
       setError(formatAuthError(err));
@@ -66,67 +58,56 @@ export default function SignInPage({ onAuthSuccess, onGoRegister, onGoHome }) {
               <span className="tw-section-label">Sign In</span>
               <h1 className="tw-auth-page__title">Welcome Back</h1>
               <p className="tw-auth-page__sub">
-                Sign in with your registered phone number and OTP to access Resume Analyzer.
+                Sign in with your email address and password to access Resume Analyzer.
               </p>
 
               {error && <div className="tw-auth-alert tw-auth-alert--error">{error}</div>}
               {info && <div className="tw-auth-alert tw-auth-alert--info">{info}</div>}
 
-              <form onSubmit={otpSent ? handleVerifyOtp : handleRequestOtp} className="tw-auth-form">
+              <form onSubmit={handleSignIn} className="tw-auth-form">
                 <label>
-                  <Phone size={14} className="me-1" /> Phone number
+                  <Mail size={14} className="me-1" /> Email Address
                   <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="10-digit mobile"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
                     required
-                    autoComplete="tel"
-                    disabled={otpSent && loading}
+                    autoComplete="email"
+                    disabled={loading}
                   />
                 </label>
 
-                {otpSent && (
-                  <label>
-                    <ShieldCheck size={14} className="me-1" /> OTP
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="6-digit code"
-                      required
-                      maxLength={6}
-                      autoComplete="one-time-code"
-                    />
-                  </label>
-                )}
-
-                {demoOtp && (
-                  <p className="tw-auth-demo-otp">
-                    Demo OTP: <strong>{demoOtp}</strong>
-                  </p>
-                )}
+                <label>
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span>
+                      <Lock size={14} className="me-1" /> Password
+                    </span>
+                    <button
+                      type="button"
+                      className="tw-auth-toggle-pwd"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      <span className="ms-1">{showPassword ? 'Hide' : 'Show'}</span>
+                    </button>
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    autoComplete="current-password"
+                    disabled={loading}
+                  />
+                </label>
 
                 <button type="submit" className="btn btn-primary tw-btn-primary w-100" disabled={loading}>
-                  {loading ? 'Please wait…' : otpSent ? 'Verify & Sign In' : 'Send OTP'}
+                  {loading ? 'Signing in…' : 'Sign In'}
                 </button>
-
-                {otpSent && (
-                  <button
-                    type="button"
-                    className="btn tw-btn-outline w-100"
-                    disabled={loading}
-                    onClick={() => {
-                      setOtpSent(false);
-                      setOtp('');
-                      setDemoOtp('');
-                      setInfo('');
-                    }}
-                  >
-                    Change phone number
-                  </button>
-                )}
               </form>
 
               <p className="tw-auth-page__footer">

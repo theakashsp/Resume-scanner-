@@ -7,10 +7,14 @@ export function getApiOrigin() {
 }
 
 export function formatAuthError(err) {
-  const data = err.response?.data;
+  if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error' || (!err?.response && err?.request)) {
+    return `Unable to reach the server at ${getApiOrigin()}. Please make sure the backend server is running.`;
+  }
+  const data = err?.response?.data;
   if (typeof data?.detail === 'string') return data.detail;
   if (Array.isArray(data?.detail)) {
-    return data.detail.map((x) => x?.msg || x).filter(Boolean).join('; ') || 'Request failed';
+    return data.detail.map((x) => (typeof x === 'string' ? x : x?.msg)).filter(Boolean).join('; ') || 'Request failed';
   }
-  return err.message || 'Something went wrong. Please try again.';
+  if (data?.message) return data.message;
+  return err?.message || 'Something went wrong. Please try again.';
 }

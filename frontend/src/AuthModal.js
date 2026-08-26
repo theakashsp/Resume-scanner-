@@ -1,32 +1,14 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { X, UserPlus, LogIn } from 'lucide-react';
-
-function getApiOrigin() {
-  const raw = process.env.REACT_APP_API_URL;
-  if (raw != null && String(raw).trim() !== '') {
-    return String(raw).trim().replace(/\/$/, '');
-  }
-  return 'http://127.0.0.1:8000';
-}
-
-function formatAuthError(err) {
-  const data = err.response?.data;
-  if (typeof data?.detail === 'string') return data.detail;
-  if (Array.isArray(data?.detail)) {
-    return data.detail.map((x) => x?.msg || x).filter(Boolean).join('; ') || 'Request failed';
-  }
-  return err.message || 'Something went wrong. Please try again.';
-}
+import { X, UserPlus, LogIn, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { formatAuthError, getApiOrigin } from './authUtils';
 
 export default function AuthModal({ mode, onClose, onAuthSuccess }) {
   const [tab, setTab] = useState(mode === 'register' ? 'register' : 'signin');
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [demoOtp, setDemoOtp] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -37,18 +19,30 @@ export default function AuthModal({ mode, onClose, onAuthSuccess }) {
     e.preventDefault();
     setError('');
     setInfo('');
+
+    if (!name.trim()) {
+      setError('Please enter your full name.');
+      return;
+    }
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
     setLoading(true);
     try {
       await axios.post(`${api}/api/auth/register`, {
         name: name.trim(),
-        phone: phone.trim(),
+        email: email.trim(),
         password,
       });
-      setInfo('Account created. Sign in with your phone number and OTP.');
+      setInfo('Account created! Please sign in with your email and password.');
       setTab('signin');
       setPassword('');
-      setOtpSent(false);
-      setDemoOtp('');
     } catch (err) {
       setError(formatAuthError(err));
     } finally {
@@ -56,33 +50,25 @@ export default function AuthModal({ mode, onClose, onAuthSuccess }) {
     }
   };
 
-  const handleRequestOtp = async (e) => {
+  const handleSignIn = async (e) => {
     e.preventDefault();
     setError('');
     setInfo('');
-    setLoading(true);
-    try {
-      const { data } = await axios.post(`${api}/api/auth/otp/request`, {
-        phone: phone.trim(),
-      });
-      setOtpSent(true);
-      setDemoOtp(data.demo_otp || '');
-      setInfo(data.message || 'OTP sent. Enter the 6-digit code.');
-    } catch (err) {
-      setError(formatAuthError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setError('');
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const { data } = await axios.post(`${api}/api/auth/otp/verify`, {
-        phone: phone.trim(),
-        otp: otp.trim(),
+      const { data } = await axios.post(`${api}/api/auth/login`, {
+        email: email.trim(),
+        password,
       });
       onAuthSuccess?.({ token: data.token, user: data.user });
       onClose?.();
@@ -123,7 +109,7 @@ export default function AuthModal({ mode, onClose, onAuthSuccess }) {
         {tab === 'register' ? (
           <form onSubmit={handleRegister} className="tw-auth-form">
             <label>
-              Full name
+              <User size={14} className="me-1" /> Full name
               <input
                 type="text"
                 value={name}
@@ -132,29 +118,45 @@ export default function AuthModal({ mode, onClose, onAuthSuccess }) {
                 required
                 minLength={2}
                 autoComplete="name"
+                disabled={loading}
               />
             </label>
             <label>
-              Phone number
+              <Mail size={14} className="me-1" /> Email Address
               <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="10-digit mobile"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
                 required
-                autoComplete="tel"
+                autoComplete="email"
+                disabled={loading}
               />
             </label>
             <label>
-              Password
+              <div className="d-flex justify-content-between align-items-center">
+                <span>
+                  <Lock size={14} className="me-1" /> Password
+                </span>
+                <button
+                  type="button"
+                  className="tw-auth-toggle-pwd"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Min 6 characters"
                 required
                 minLength={6}
                 autoComplete="new-password"
+                disabled={loading}
               />
             </label>
             <button type="submit" className="btn btn-primary tw-btn-primary w-100" disabled={loading}>
@@ -162,52 +164,47 @@ export default function AuthModal({ mode, onClose, onAuthSuccess }) {
             </button>
           </form>
         ) : (
-          <form onSubmit={otpSent ? handleVerifyOtp : handleRequestOtp} className="tw-auth-form">
+          <form onSubmit={handleSignIn} className="tw-auth-form">
             <label>
-              Phone number
+              <Mail size={14} className="me-1" /> Email Address
               <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="10-digit mobile"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
                 required
-                autoComplete="tel"
-                disabled={otpSent && loading}
+                autoComplete="email"
+                disabled={loading}
               />
             </label>
-            {otpSent && (
-              <label>
-                OTP
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="6-digit code"
-                  required
-                  maxLength={6}
-                  autoComplete="one-time-code"
-                />
-              </label>
-            )}
-            {demoOtp && (
-              <p className="tw-auth-demo-otp">
-                Demo OTP: <strong>{demoOtp}</strong>
-              </p>
-            )}
-            <button type="submit" className="btn btn-primary tw-btn-primary w-100" disabled={loading}>
-              {loading ? 'Please wait…' : otpSent ? 'Verify & Sign In' : 'Send OTP'}
-            </button>
-            {otpSent && (
-              <button
-                type="button"
-                className="btn tw-btn-outline w-100"
+            <label>
+              <div className="d-flex justify-content-between align-items-center">
+                <span>
+                  <Lock size={14} className="me-1" /> Password
+                </span>
+                <button
+                  type="button"
+                  className="tw-auth-toggle-pwd"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                autoComplete="current-password"
                 disabled={loading}
-                onClick={() => { setOtpSent(false); setOtp(''); setDemoOtp(''); setInfo(''); }}
-              >
-                Change phone number
-              </button>
-            )}
+              />
+            </label>
+            <button type="submit" className="btn btn-primary tw-btn-primary w-100" disabled={loading}>
+              {loading ? 'Signing in…' : 'Sign In'}
+            </button>
           </form>
         )}
       </div>

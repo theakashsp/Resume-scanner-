@@ -122,7 +122,7 @@ function Navbar({ scrolled, user, onOpenAuth, onLogout, onGoHome }) {
         <div className="tw-navbar__actions">
           {user ? (
             <>
-              <span className="tw-navbar__user" title={user.phone}>
+              <span className="tw-navbar__user" title={user.email || user.phone || user.name}>
                 <User size={16} />
                 {user.name}
               </span>
@@ -391,6 +391,9 @@ function App() {
   const [authPage, setAuthPage] = useState(null);
   const [authUser, setAuthUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
+  const [exploreJobsData, setExploreJobsData] = useState(null);
+  const [selectedExploreRole, setSelectedExploreRole] = useState('Full Stack Developer');
+  const [exploreLoading, setExploreLoading] = useState(false);
 
   const timelineStep = useMemo(() => {
     if (results) return 3;
@@ -436,6 +439,16 @@ function App() {
     axios.get(`${api}/api/platform-stats`).then((r) => setPlatformStats(r.data)).catch(() => {});
     axios.get(`${api}/api/features`).then((r) => setFeatures(r.data?.features || [])).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const api = getApiOrigin();
+    setExploreLoading(true);
+    axios
+      .get(`${api}/api/explore-jobs?role=${encodeURIComponent(selectedExploreRole)}`)
+      .then((r) => setExploreJobsData(r.data))
+      .catch(() => {})
+      .finally(() => setExploreLoading(false));
+  }, [selectedExploreRole]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -703,9 +716,48 @@ function App() {
                   jobsMessage={jobsMessage}
                   jobsCount={jobsCount}
                   loading={false}
+                  title="Personalized Job Matches — For Your Profile"
+                  subtitle="Verified India openings matching your evaluated resume skills & recommended roles"
                 />
               </div>
             </div>
+          </div>
+        </section>
+      )}
+
+      {!results && (
+        <section className="tw-section tw-section--alt" id="listings">
+          <div className="container">
+            <div className="d-flex flex-wrap justify-content-center gap-2 mb-4">
+              {[
+                'Full Stack Developer',
+                'Data Analyst',
+                'Cloud & DevOps Engineer',
+                'Python Developer',
+                'React Developer',
+                'AI/ML Engineer',
+                'UI/UX Designer',
+                'Financial Analyst',
+              ].map((roleName) => (
+                <button
+                  key={roleName}
+                  type="button"
+                  className={`btn btn-sm ${selectedExploreRole === roleName ? 'btn-primary tw-btn-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => setSelectedExploreRole(roleName)}
+                >
+                  {roleName}
+                </button>
+              ))}
+            </div>
+            <LiveJobOpenings
+              recommendedRoles={exploreJobsData?.roles || [selectedExploreRole]}
+              jobsByRole={exploreJobsData?.jobs_by_role || {}}
+              jobsMessage={exploreJobsData?.jobs_message}
+              jobsCount={exploreJobsData?.jobs_count || 0}
+              loading={exploreLoading}
+              title={`Live Openings for ${selectedExploreRole}`}
+              subtitle="Browse real-time openings in India across top tech companies, startups & enterprises"
+            />
           </div>
         </section>
       )}
