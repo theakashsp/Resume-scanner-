@@ -1,3 +1,7 @@
+// ==============================================================================
+// TECH STACK: [React 19 & Lucide Icons] - Live Job Openings Interactive Dashboard
+// Displays live opportunities aggregated from JSearch (RapidAPI) / Adzuna APIs
+// ==============================================================================
 import React, { useState, useMemo } from 'react';
 import { MapPin, Briefcase, Building2, ExternalLink, Search, Filter, Sparkles } from 'lucide-react';
 

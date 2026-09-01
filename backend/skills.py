@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+# ==============================================================================
+# TECH STACK: [Domain Taxonomy & Heuristic NLP Engine] - Multi-Domain Skill Matching
+# Defines 12+ industry domain profiles, signal keywords, role hierarchies & skill pools
+# ==============================================================================
 import re
 from typing import Any
 

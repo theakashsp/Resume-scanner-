@@ -1,3 +1,7 @@
+// ==============================================================================
+// TECH STACK: [HTML5 Canvas & JavaScript Animation] - Interactive Particle Background
+// Renders dynamic, responsive node network constellation in real-time
+// ==============================================================================
 import React, { useEffect, useRef } from 'react';
 
 export default function TechBackground() {

@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import re
 
+# ==============================================================================
+# TECH STACK: [pdfminer.six] - Primary High-Precision PDF Text & Layout Extractor
+# ==============================================================================
 from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pdfminer.layout import LAParams
 
+# ==============================================================================
+# TECH STACK: [pypdf] - Fallback Secondary PDF Parser for robust extraction
+# ==============================================================================
 try:
     from pypdf import PdfReader
 except ImportError:

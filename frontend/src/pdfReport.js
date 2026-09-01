@@ -1,3 +1,8 @@
+// ==============================================================================
+// TECH STACK: [jsPDF & jspdf-autotable] - Client-Side Dynamic PDF Report Engine
+// - jsPDF: Core vector document & layout generator
+// - jspdf-autotable: Tabular formatting for skills, roadmaps, and job listings
+// ==============================================================================
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 

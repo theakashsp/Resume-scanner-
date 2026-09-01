@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+# ==============================================================================
+# TECH STACK: [Cryptography & Security] - PBKDF2-HMAC-SHA256 & Session Token Auth
+# ==============================================================================
 import hashlib
 import hmac
 import json

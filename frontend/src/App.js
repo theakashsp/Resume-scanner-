@@ -1,6 +1,23 @@
+// ==============================================================================
+// TECH STACK OVERVIEW - FRONTEND:
+// - UI Framework: React 19 (Hooks, Concurrent Rendering)
+// - Drag & Drop File Upload: react-dropzone
+// - HTTP & API Client: Axios
+// - Icon System: Lucide React
+// - Client-Side PDF Generation: jsPDF + jspdf-autotable (via pdfReport module)
+// - Styling & Layout: Vanilla CSS (Custom Design Tokens, Glassmorphism, Bootstrap Grid)
+// ==============================================================================
+
+// --- [TECH STACK: React 19] Core UI Library & Lifecycle Hooks ---
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+
+// --- [TECH STACK: react-dropzone] Drag-and-drop file upload engine ---
 import { useDropzone } from 'react-dropzone';
+
+// --- [TECH STACK: Axios] Promise-based HTTP Client for Backend Communication ---
 import axios from 'axios';
+
+// --- [TECH STACK: Lucide React] Clean, customizable SVG icons ---
 import {
   Upload,
   FileSearch,
@@ -21,10 +38,15 @@ import {
   LogOut,
   User,
 } from 'lucide-react';
+
 import LiveJobOpenings from './LiveJobOpenings';
 import SignInPage from './SignInPage';
 import RegisterPage from './RegisterPage';
+
+// --- [TECH STACK: jsPDF & jspdf-autotable] Career Report Generator ---
 import { generateCareerReportPdf } from './pdfReport';
+
+// --- [TECH STACK: Custom CSS & Styling] ---
 import './App.css';
 
 const AUTH_STORAGE_KEY = 'ra_auth';

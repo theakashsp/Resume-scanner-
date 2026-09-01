@@ -1,3 +1,6 @@
+# ==============================================================================
+# TECH STACK: [Scikit-Learn & Joblib] - TF-IDF Vectorization & Logistic Regression ML Classifier
+# ==============================================================================
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression

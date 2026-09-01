@@ -1,7 +1,10 @@
+# ==============================================================================
+# TECH STACK: [Sentence-Transformers & NLP Embeddings] - Semantic Embedding Similarity
+# ==============================================================================
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
 
-# Load model once
+# Load pre-trained Transformer model once for high-efficiency semantic embeddings
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 COMMON_SKILLS = [

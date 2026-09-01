@@ -1,3 +1,6 @@
+// ==============================================================================
+// TECH STACK: [Axios Error Handling & Environment Config] - API Origin & Auth Helpers
+// ==============================================================================
 export function getApiOrigin() {
   const raw = process.env.REACT_APP_API_URL;
   if (raw != null && String(raw).trim() !== '') {

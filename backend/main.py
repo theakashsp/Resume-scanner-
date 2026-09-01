@@ -28,18 +28,41 @@ def _log(msg: object) -> None:
         pass
 
 
+# ==============================================================================
+# TECH STACK OVERVIEW - BACKEND:
+# - Web Framework: FastAPI (Uvicorn ASGI Server)
+# - Request/Response Validation: Pydantic
+# - Generative AI / LLM: Google Gemini 2.5 Flash (google-genai SDK)
+# - PDF Text Extraction: pdfminer.six + pypdf (via pdf_parser module)
+# - Job Search Integrations: JSearch API (via RapidAPI) & Adzuna India API (via Requests)
+# - Domain Matching & Taxonomy: Heuristic NLP engine (via skills module)
+# - Authentication: Session & Token-based Auth Store (auth_store module)
+# ==============================================================================
+
+# --- [TECH STACK: Requests] HTTP client for External Job APIs (JSearch / Adzuna) ---
 import requests
 from dotenv import load_dotenv
+
+# --- [TECH STACK: FastAPI] High-performance Web Framework & Middleware ---
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
+# --- [TECH STACK: Google Gemini] LLM API for deep resume analysis & roadmaps ---
 from google import genai
 from google.genai import types
 from pathlib import Path
+
+# --- [TECH STACK: pdfminer.six & pypdf] Text extraction from PDF documents ---
 from pdf_parser import extract_pdf_text
+
+# --- [TECH STACK: Pydantic] Data validation and schema definition ---
 from pydantic import BaseModel, Field
 
+# --- [TECH STACK: Auth Store] Local user registration & session management ---
 import auth_store
+
+# --- [TECH STACK: Heuristic & NLP Skills Engine] Domain detection & role taxonomy ---
 from skills import (
     DOMAIN_PROFILES,
     _NON_RESUME_SIGNALS,
@@ -54,6 +77,8 @@ from skills import (
 
 _BACKEND_DIR = Path(__file__).resolve().parent
 load_dotenv(_BACKEND_DIR / ".env")
+
+# --- [TECH STACK: Environment Variables / Config] ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "").strip()
 RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "jsearch.p.rapidapi.com").strip()
@@ -81,6 +106,9 @@ def _is_real_key(value: str | None) -> bool:
     return key.lower() not in _PLACEHOLDER_KEYS and not key.lower().startswith("your_")
 
 
+# ==============================================================================
+# TECH STACK: [Google Gemini 2.5 Flash] - LLM client initialization via google-genai SDK
+# ==============================================================================
 _genai_client = (
     genai.Client(
         api_key=GEMINI_API_KEY.strip(),
@@ -119,9 +147,16 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:3002",
 ]
 
+# ==============================================================================
+# TECH STACK: [FastAPI] - Application instance, OpenAPI documentation & CORS Middleware
+# ==============================================================================
 INVALID_RESUME_ERROR = "Invalid document type. Please upload a valid resume."
 
-app = FastAPI(title="Resume Analyzer API", version="4.0")
+app = FastAPI(
+    title="Resume Analyzer API",
+    version="4.0",
+    description="Full-stack AI Career Intelligence Engine powered by FastAPI & Google Gemini",
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -222,6 +257,9 @@ GEMINI_RESUME_SCHEMA = {
     "required": ["is_valid_resume"],
 }
 
+# ==============================================================================
+# TECH STACK: [Pydantic] - Data Validation & Serialization Models
+# ==============================================================================
 class FetchJobsRequest(BaseModel):
     recommended_roles: list[str] = Field(default_factory=list)
 
@@ -364,6 +402,9 @@ def _generate_curated_india_jobs(role_category: str, limit: int = 4) -> list[dic
     return jobs
 
 
+# ==============================================================================
+# TECH STACK: [JSearch API via RapidAPI] - Live real-time India job market search
+# ==============================================================================
 def fetch_jsearch_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[dict[str, Any]]:
     if not _is_real_key(RAPIDAPI_KEY):
         return []
@@ -406,6 +447,9 @@ def fetch_jsearch_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[d
     return out[:limit]
 
 
+# ==============================================================================
+# TECH STACK: [Adzuna India API] - Alternative live job search provider
+# ==============================================================================
 def fetch_adzuna_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[dict[str, Any]]:
     if not (_is_real_key(ADZUNA_APP_ID) and _is_real_key(ADZUNA_APP_KEY)):
         return []
@@ -703,6 +747,9 @@ def _build_text_only_analysis(extracted_text: str) -> dict[str, Any]:
     return mapped
 
 
+# ==============================================================================
+# TECH STACK: [Google Gemini 2.5 Flash] - LLM Structured Generation & Deep Resume Analysis
+# ==============================================================================
 def analyze_resume_with_gemini(extracted_text: str) -> dict[str, Any]:
     if _genai_client is None:
         raise RuntimeError("GEMINI_API_KEY missing")

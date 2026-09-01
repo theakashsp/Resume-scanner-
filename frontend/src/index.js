@@ -1,3 +1,6 @@
+// ==============================================================================
+// TECH STACK: [React 19 & ReactDOM] - Application Root Mounting
+// ==============================================================================
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
