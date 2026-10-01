@@ -132,6 +132,41 @@ function ensureSpace(doc, y, needed = 40) {
   return y;
 }
 
+function parseSuggestionsIntoCategories(rawText) {
+  if (!rawText || typeof rawText !== 'string') {
+    return [
+      {
+        title: 'Executive Career Guidance',
+        points: ['Review resume competencies and align project bullet points with target role expectations.'],
+      },
+    ];
+  }
+
+  const sections = [];
+  const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean);
+  let currentCat = null;
+
+  lines.forEach((line) => {
+    const isCategoryHeader = (line.startsWith('•') && line.includes(':') && !line.includes(' - ')) || line.startsWith('###') || line.startsWith('##');
+    if (isCategoryHeader) {
+      const title = line.replace(/^[•#*\s]+/, '').replace(/:$/, '').trim();
+      currentCat = { title, points: [] };
+      sections.push(currentCat);
+    } else if (currentCat) {
+      const pt = line.replace(/^[•\-*>\s]+/, '').trim();
+      if (pt) currentCat.points.push(pt);
+    } else {
+      const pt = line.replace(/^[•\-*>\s]+/, '').trim();
+      if (pt) {
+        currentCat = { title: 'Personalized Career Guidance', points: [pt] };
+        sections.push(currentCat);
+      }
+    }
+  });
+
+  return sections.length > 0 ? sections : [{ title: 'Personalized Career Guidance', points: [rawText] }];
+}
+
 export function generateCareerReportPdf({
   candidateName,
   candidateEmail,
@@ -144,6 +179,7 @@ export function generateCareerReportPdf({
   matched,
   missing,
   careerSuggestions,
+  structuredSuggestions,
   roadmap,
   customRoadmap,
   jobsByRole,
@@ -192,7 +228,7 @@ export function generateCareerReportPdf({
     ]],
     theme: 'grid',
     styles: {
-      fontSize: 9,
+      fontSize: 8.5,
       cellPadding: 4,
       textColor: COLORS.slate,
       lineColor: [226, 232, 240],
@@ -213,18 +249,60 @@ export function generateCareerReportPdf({
   y = (doc.lastAutoTable?.finalY || y) + 10;
 
   y = ensureSpace(doc, y, 35);
-  y = drawSectionTitle(doc, y, 'Career Suggestions', 'Personalized guidance based on your resume');
-  doc.setFillColor(245, 243, 255);
-  doc.setDrawColor(...COLORS.purple);
-  const suggestionText = careerSuggestions || 'No career suggestions available.';
-  const suggestionLines = doc.splitTextToSize(suggestionText, 174);
-  const boxHeight = Math.max(22, suggestionLines.length * 4.5 + 10);
-  doc.roundedRect(14, y, 182, boxHeight, 2, 2, 'FD');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(...COLORS.slate);
-  doc.text(suggestionLines, 18, y + 8);
-  y += boxHeight + 8;
+  y = drawSectionTitle(doc, y, 'AI Career Intelligence & Suggestions', 'Structured career optimization & actionable roadmap advice');
+
+  const suggestionsList = Array.isArray(structuredSuggestions) && structuredSuggestions.length > 0
+    ? structuredSuggestions
+    : parseSuggestionsIntoCategories(careerSuggestions);
+
+  suggestionsList.forEach((cat) => {
+    const title = cat.title || 'Career Advice';
+    const points = Array.isArray(cat.points) ? cat.points : [String(cat.points || '')];
+    
+    // Clean and wrap bullet points
+    const wrappedPoints = points.map((pt) => {
+      const cleanPt = String(pt).replace(/[^\x20-\x7E]/g, ' ');
+      return doc.splitTextToSize(`* ${cleanPt}`, 166);
+    });
+    
+    const totalLines = wrappedPoints.reduce((acc, l) => acc + l.length, 0);
+    const cardHeight = Math.max(16, 9 + totalLines * 4.2 + (points.length - 1) * 2);
+
+    y = ensureSpace(doc, y, cardHeight + 5);
+
+    // Card background
+    doc.setFillColor(...COLORS.surface);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, y, 182, cardHeight, 2, 2, 'FD');
+
+    // Left accent bar
+    doc.setFillColor(...COLORS.purple);
+    doc.rect(14, y, 3, cardHeight, 'F');
+
+    // Category Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...COLORS.purple);
+    doc.text(title, 20, y + 6);
+
+    // Bullet points
+    let currentLineY = y + 11;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...COLORS.slate);
+
+    wrappedPoints.forEach((lines) => {
+      lines.forEach((line) => {
+        doc.text(line, 20, currentLineY);
+        currentLineY += 4;
+      });
+      currentLineY += 1.2;
+    });
+
+    y += cardHeight + 4;
+  });
+
+  y += 4;
 
   const roadmapRows = (roadmap.length ? roadmap : []).map((step) => [
     String(step.step ?? ''),

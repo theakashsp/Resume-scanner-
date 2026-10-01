@@ -19,9 +19,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Site Reliability Engineer", "Platform Engineer", "Cloud Support Engineer",
         ],
         "skill_pool": [
-            "aws", "azure", "gcp", "ec2", "s3", "lambda", "cloudformation",
-            "docker", "kubernetes", "terraform", "ansible", "jenkins", "ci/cd",
-            "linux", "monitoring", "vpc", "iam", "rds", "eks", "helm",
+            "Docker", "Kubernetes", "AWS", "Azure", "Google Cloud (GCP)", "Terraform",
+            "CI/CD", "Linux / Shell", "Ansible", "Jenkins", "VPC & IAM", "Monitoring & Logging",
+            "Microservices", "Helm", "Git / GitHub",
         ],
     },
     "Information Technology": {
@@ -36,10 +36,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Java Developer", "Python Developer",
         ],
         "skill_pool": [
-            "c", "c++", "c#", "java", "python", "javascript", "typescript", "react",
-            "node.js", "sql", "git", "docker", "aws", "rest api", "agile", "testing",
-            "html", "css", "microservices", "mongodb", "postgresql", "redis",
-            "fastapi", "django", "spring boot", "data structures", "algorithms",
+            "C++", "C#", "TypeScript", "Docker", "AWS", "Microservices", "Redis",
+            "PostgreSQL", "Spring Boot", "FastAPI", "Data Structures & Algorithms",
+            "CI/CD", "Next.js", "Kubernetes", "Linux / Shell", "GraphQL",
         ],
     },
     "Embedded & Systems Engineering": {
@@ -52,9 +51,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "IoT Solutions Engineer", "System Software Engineer",
         ],
         "skill_pool": [
-            "c", "c++", "embedded c", "microcontrollers", "arm", "rtos", "firmware",
-            "linux kernel", "device drivers", "i2c", "spi", "uart", "iot", "assembly",
-            "system programming", "socket programming", "multithreading",
+            "Embedded C", "C++", "FreeRTOS", "ARM Architecture", "Device Drivers",
+            "Linux Kernel", "I2C / SPI / UART", "Socket Programming", "Microcontrollers",
+            "Multithreading", "Debugging & GDB", "PCB Design Basics",
         ],
     },
     "Data Science & AI": {
@@ -67,9 +66,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Machine Learning Researcher", "Data Engineer",
         ],
         "skill_pool": [
-            "python", "r", "machine learning", "deep learning", "nlp", "computer vision",
-            "tensorflow", "pytorch", "scikit-learn", "pandas", "numpy", "sql",
-            "power bi", "tableau", "statistics", "data visualization",
+            "PyTorch", "TensorFlow", "Scikit-Learn", "Machine Learning", "Deep Learning",
+            "NLP", "Computer Vision", "Data Visualization", "SQL", "Pandas",
+            "NumPy", "MLOps", "Feature Engineering", "Statistical Modeling",
         ],
     },
     "Network Engineering": {
@@ -82,8 +81,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Security Network Engineer", "Infrastructure Engineer",
         ],
         "skill_pool": [
-            "cisco", "routing", "switching", "tcp/ip", "wireshark", "bgp", "ospf",
-            "firewall", "vlan", "dns", "dhcp", "lan", "wan", "network security", "ccna",
+            "Cisco Networking", "TCP/IP & Subnetting", "Routing (BGP/OSPF)", "Wireshark",
+            "Network Firewalls", "VLAN Configuration", "DNS / DHCP", "Network Security",
+            "VPN Configuration", "CCNA Standards", "Linux Networking",
         ],
     },
     "Commerce & Finance": {
@@ -96,8 +96,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Business Development Executive", "Operations Coordinator",
         ],
         "skill_pool": [
-            "financial analysis", "ms excel", "tally", "gst compliance",
-            "financial reporting", "bank reconciliation", "budgeting", "forecasting",
+            "Financial Modeling", "Advanced MS Excel", "Tally ERP / Prime", "GST Compliance",
+            "Financial Reporting", "Bank Reconciliation", "Taxation & TDS", "Budgeting & Forecasting",
+            "Auditing Standards", "Cost Accounting",
         ],
     },
     "Marketing & Operations": {
@@ -110,8 +111,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Business Analyst", "Customer Relations Manager",
         ],
         "skill_pool": [
-            "digital marketing", "seo", "content strategy", "operations management",
-            "customer relations", "crm", "market research", "campaign management",
+            "Digital Marketing", "SEO & SEM", "Google Analytics", "Content Strategy",
+            "CRM Management (HubSpot/Salesforce)", "Market Research", "Social Media Campaigns",
+            "Operations & Supply Chain", "Performance Marketing",
         ],
     },
     "Healthcare": {
@@ -124,8 +126,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Healthcare Administrator", "Clinical Research Coordinator",
         ],
         "skill_pool": [
-            "patient care", "clinical documentation", "medical terminology",
-            "healthcare compliance", "pharmacology basics", "vital signs monitoring",
+            "Patient Care & Triage", "Clinical Documentation", "Medical Terminology",
+            "Healthcare Compliance (NABH)", "Pharmacology Basics", "Vital Signs Monitoring",
+            "Electronic Health Records (EHR)", "Infection Control",
         ],
     },
     "Education": {
@@ -138,8 +141,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Instructional Designer", "Education Counselor",
         ],
         "skill_pool": [
-            "curriculum planning", "classroom management", "lesson delivery",
-            "student assessment", "educational technology", "communication",
+            "Curriculum Planning", "Classroom Management", "Pedagogical Delivery",
+            "Student Assessment", "EdTech Tools (LMS)", "Academic Counseling",
+            "Public Speaking & Presentation",
         ],
     },
     "Management": {
@@ -152,8 +156,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Business Operations Manager", "Assistant Manager",
         ],
         "skill_pool": [
-            "project management", "leadership", "stakeholder management",
-            "business communication", "team management", "strategic planning",
+            "Project Management (Agile/Scrum)", "Stakeholder Management", "Strategic Planning",
+            "Team Leadership", "Business Analytics", "Risk Management",
+            "Process Optimization", "Performance Management",
         ],
     },
     "Arts & Humanities": {
@@ -166,8 +171,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Customer Support Specialist", "Research Assistant",
         ],
         "skill_pool": [
-            "written communication", "research", "content writing", "editing",
-            "critical thinking", "presentation", "customer service",
+            "Professional Content Writing", "Editorial Review & Copywriting", "Research Methodology",
+            "Public Relations & Communications", "Brand Storytelling", "Social Media Management",
+            "Creative Problem Solving",
         ],
     },
     "Administration": {
@@ -180,8 +186,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Operations Assistant", "Front Office Executive",
         ],
         "skill_pool": [
-            "ms office", "scheduling", "documentation", "coordination",
-            "email etiquette", "record keeping", "customer handling",
+            "Advanced MS Office / Google Workspace", "Executive Scheduling", "Office Operations",
+            "Business Correspondence", "Records & Database Management", "Vendor Coordination",
+            "Customer Relationship Management",
         ],
     },
     "Core Engineering": {
@@ -194,8 +201,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Quality Engineer", "Production Engineer",
         ],
         "skill_pool": [
-            "autocad", "technical drawing", "safety standards", "quality control",
-            "project documentation", "team coordination", "matlab", "solidworks",
+            "AutoCAD 2D/3D", "SolidWorks / CATIA", "MATLAB & Simulink", "Quality Control (Six Sigma)",
+            "Technical Documentation", "Engineering Standards (ISO/ASME)", "Root Cause Analysis",
+            "Finite Element Analysis (FEA)",
         ],
     },
     "General / Fresher": {
@@ -205,8 +213,9 @@ DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
             "Customer Support Associate", "Operations Trainee",
         ],
         "skill_pool": [
-            "communication", "ms office", "teamwork", "time management",
-            "problem solving", "adaptability", "customer relations",
+            "Professional Communication", "MS Office / Excel", "Critical Problem Solving",
+            "Project Coordination", "Time Management", "Presentation Skills",
+            "Analytical Thinking",
         ],
     },
 }
@@ -944,10 +953,94 @@ def _looks_like_location_skill(value: str) -> bool:
     return any(m in lower for m in markers)
 
 
+_SKILL_KEY_MAP = {
+    "react": "react",
+    "react.js": "react",
+    "reactjs": "react",
+    "node": "node",
+    "node.js": "node",
+    "nodejs": "node",
+    "express": "express",
+    "express.js": "express",
+    "expressjs": "express",
+    "next": "nextjs",
+    "next.js": "nextjs",
+    "nextjs": "nextjs",
+    "git": "git",
+    "github": "git",
+    "git / github": "git",
+    "git/github": "git",
+    "c++": "cpp",
+    "cpp": "cpp",
+    "c#": "csharp",
+    "csharp": "csharp",
+    "c": "c",
+    "aws": "aws",
+    "amazon web services": "aws",
+    "gcp": "gcp",
+    "google cloud": "gcp",
+    "google cloud (gcp)": "gcp",
+    "azure": "azure",
+    "microsoft azure": "azure",
+    "html": "htmlcss",
+    "css": "htmlcss",
+    "html/css": "htmlcss",
+    "html5": "htmlcss",
+    "css3": "htmlcss",
+    "postgresql": "postgres",
+    "postgres": "postgres",
+    "sql": "sql",
+    "mysql": "mysql",
+    "dsa": "dsa",
+    "data structures": "dsa",
+    "algorithms": "dsa",
+    "data structures & algorithms": "dsa",
+    "rest api": "restapi",
+    "rest apis": "restapi",
+    "restful apis": "restapi",
+    "api": "restapi",
+    "docker": "docker",
+    "kubernetes": "k8s",
+    "k8s": "k8s",
+    "ci/cd": "cicd",
+    "cicd": "cicd",
+    "linux": "linux",
+    "linux / shell": "linux",
+    "spring boot": "springboot",
+    "springboot": "springboot",
+    "fastapi": "fastapi",
+    "django": "django",
+    "flask": "flask",
+    "mongodb": "mongodb",
+    "redis": "redis",
+    "typescript": "typescript",
+    "javascript": "javascript",
+    "python": "python",
+    "java": "java",
+}
+
+
+def _skill_normalized_key(skill_name: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9+#/]", "", skill_name.lower().strip())
+    if skill_name.lower().strip() in _SKILL_KEY_MAP:
+        return _SKILL_KEY_MAP[skill_name.lower().strip()]
+    if cleaned in _SKILL_KEY_MAP:
+        return _SKILL_KEY_MAP[cleaned]
+    return cleaned
+
+
 def compute_missing_skills(matched: list[str], domain: str) -> list[str]:
     pool = DOMAIN_PROFILES.get(domain, DOMAIN_PROFILES["Information Technology"])["skill_pool"]
-    matched_lower = {m.lower() for m in matched}
-    missing = [s for s in pool if s.lower() not in matched_lower]
+    matched_keys = {_skill_normalized_key(m) for m in matched if m}
+    missing: list[str] = []
+    seen_keys: set[str] = set()
+
+    for s in pool:
+        k = _skill_normalized_key(s)
+        if k not in matched_keys and k not in seen_keys:
+            seen_keys.add(k)
+            missing.append(s)
+
     return missing[:8] if missing else pool[:4]
 
 

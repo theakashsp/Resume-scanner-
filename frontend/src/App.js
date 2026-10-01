@@ -401,6 +401,89 @@ function Footer() {
   );
 }
 
+function AiCareerSuggestionsSection({ structuredSuggestions, careerSuggestions }) {
+  const suggestions = useMemo(() => {
+    if (Array.isArray(structuredSuggestions) && structuredSuggestions.length > 0) {
+      return structuredSuggestions;
+    }
+    if (!careerSuggestions) return [];
+
+    const lines = String(careerSuggestions).split('\n').map((l) => l.trim()).filter(Boolean);
+    const result = [];
+    let cur = null;
+    lines.forEach((line) => {
+      const isHeader = (line.startsWith('•') && line.includes(':') && !line.includes(' - ')) || line.startsWith('###') || line.startsWith('##');
+      if (isHeader) {
+        const title = line.replace(/^[•#*\s]+/, '').replace(/:$/, '').trim();
+        cur = { title, points: [] };
+        result.push(cur);
+      } else if (cur) {
+        const pt = line.replace(/^[•\-*>\s]+/, '').trim();
+        if (pt) cur.points.push(pt);
+      } else {
+        const pt = line.replace(/^[•\-*>\s]+/, '').trim();
+        if (pt) {
+          cur = { title: 'Executive Career Guidance', points: [pt] };
+          result.push(cur);
+        }
+      }
+    });
+    return result.length > 0 ? result : [{ title: 'Personalized AI Career Guidance', points: [String(careerSuggestions)] }];
+  }, [structuredSuggestions, careerSuggestions]);
+
+  const [activeTab, setActiveTab] = useState(0);
+
+  if (!suggestions.length) return null;
+
+  return (
+    <div className="tw-ai-suggestions-card mb-4">
+      <div className="tw-ai-suggestions-head">
+        <div className="d-flex align-items-center gap-2">
+          <div className="tw-ai-badge-icon">
+            <Zap size={20} />
+          </div>
+          <div>
+            <h3 className="tw-ai-title mb-0">AI Career Intelligence & Suggestions</h3>
+            <p className="tw-ai-subtitle mb-0">Actionable advice calibrated to your resume content & target role</p>
+          </div>
+        </div>
+        <span className="tw-ai-model-tag">
+          <Zap size={12} /> AI Advisor
+        </span>
+      </div>
+
+      <div className="tw-ai-tabs">
+        {suggestions.map((item, idx) => (
+          <button
+            key={idx}
+            type="button"
+            className={`tw-ai-tab ${activeTab === idx ? 'tw-ai-tab--active' : ''}`}
+            onClick={() => setActiveTab(idx)}
+          >
+            {item.title}
+          </button>
+        ))}
+      </div>
+
+      {suggestions[activeTab] && (
+        <div className="tw-ai-tab-content">
+          <div className="tw-ai-category-header">
+            <h4>{suggestions[activeTab].title}</h4>
+          </div>
+          <ul className="tw-ai-points-list">
+            {(suggestions[activeTab].points || []).map((pt, i) => (
+              <li key={i} className="tw-ai-point-item">
+                <CheckCircle2 size={16} className="tw-ai-point-icon" />
+                <span>{pt}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -549,6 +632,7 @@ function App() {
   const role = results?.predicted_role;
   const roadmap = results?.learning_roadmap ?? [];
   const careerSuggestions = results?.career_suggestions ?? results?.custom_suggestion ?? '';
+  const structuredSuggestions = results?.structured_suggestions ?? [];
   const meta = results?.candidate_metadata ?? {};
   const candidateName = meta.candidate_name || results?.candidate_name || 'Not found';
   const candidateEmail = meta.candidate_email || results?.candidate_email || 'Not found';
@@ -574,6 +658,7 @@ function App() {
       matched,
       missing,
       careerSuggestions,
+      structuredSuggestions,
       roadmap,
       customRoadmap: results?.custom_roadmap ?? [],
       jobsByRole,
@@ -722,12 +807,17 @@ function App() {
                 </div>
               </div>
 
+              <AiCareerSuggestionsSection
+                structuredSuggestions={structuredSuggestions}
+                careerSuggestions={careerSuggestions}
+              />
+
               <div className="text-center mb-4">
                 <button type="button" className="btn btn-primary tw-btn-primary" onClick={generatePDFReport}>
                   Download Career Report (PDF)
                 </button>
                 <p className="text-muted mt-2 small">
-                  Career suggestions and milestone roadmaps are included in the PDF report only.
+                  Complete report including candidate profile, ATS score, skills breakdown, AI suggestions, learning roadmap, and live job links.
                 </p>
               </div>
 

@@ -253,6 +253,7 @@ GEMINI_RESUME_SCHEMA = {
         "current_skills": {"type": "array", "items": {"type": "string"}},
         "missing_skills": {"type": "array", "items": {"type": "string"}},
         "custom_roadmap": {"type": "array", "items": {"type": "string"}},
+        "career_suggestions": {"type": "string"},
     },
     "required": ["is_valid_resume"],
 }
@@ -600,21 +601,115 @@ def _roadmap_strings_to_objects(steps: list[Any]) -> list[dict[str, Any]]:
     return out
 
 
-def _build_suggestion_from_resume(
+def _generate_structured_ai_suggestions(
     domain: str,
     target_role: str,
+    ats_score: int,
     current_skills: list[str],
     missing_skills: list[str],
-    roadmap: list[str],
-) -> str:
-    skills_text = ", ".join(current_skills[:6]) if current_skills else "the experience described in your resume"
-    gaps_text = ", ".join(missing_skills[:5]) if missing_skills else "role-specific competencies tied to your target path"
-    path_text = " → ".join(roadmap[:3]) if roadmap else f"progression toward {target_role}"
-    return (
-        f"Based strictly on your uploaded resume, your background aligns with {domain}. "
-        f"A realistic next-step target is {target_role}. Documented strengths include {skills_text}. "
-        f"Close gaps in {gaps_text} to improve readiness. Suggested path: {path_text}."
-    )
+    extracted_text: str = "",
+) -> tuple[str, list[dict[str, Any]]]:
+    clean_role = target_role or "Software Professional"
+    primary_skills = current_skills[:5] if current_skills else ["Core Technical Competencies"]
+    skills_str = ", ".join(primary_skills)
+    top_gaps = missing_skills[:4] if missing_skills else ["Cloud Architecture & CI/CD"]
+    gaps_str = ", ".join(top_gaps)
+
+    # 1. Target Role & Profile Positioning
+    positioning_points = [
+        f"Role Alignment: Your demonstrated skills in {skills_str} establish a strong technical baseline for {clean_role} positions in {domain}.",
+        f"Summary Statement: Add a crisp 2-line summary at the top of your resume: '{clean_role} proficient in {primary_skills[0] if primary_skills else 'software engineering'} with demonstrated project experience in modern {domain} workflows.'",
+        f"Domain Authority: Frame academic coursework and personal projects around industry use-cases to showcase commercial readiness.",
+    ]
+
+    # 2. High-Priority Technical Skills to Bridge
+    skills_points = [
+        f"Priority Competencies: Fast-track hands-on proficiency in {top_gaps[0] if top_gaps else 'System Design'}{f' and {top_gaps[1]}' if len(top_gaps) > 1 else ''} to directly match modern {clean_role} job listings.",
+        f"Evidence-Based Learning: Rather than theoretical tutorials, build production-grade modules demonstrating these missing tools in your active GitHub repositories.",
+    ]
+    if len(top_gaps) > 2:
+        skills_points.append(f"Secondary Tooling: Explore {', '.join(top_gaps[2:])} to broaden your versatility for full-stack and cloud-native workflows.")
+
+    # 3. ATS Optimization & Bullet-Point Formulation
+    ats_points = [
+        "Google XYZ Formula: Format all project and experience bullet points as 'Accomplished [X], measured by [Y]%, by implementing [Z]' to maximize recruiter and ATS scoring.",
+        f"Power Verbs: Start every description with strong action verbs (e.g., 'Architected', 'Engineered', 'Optimized', 'Automated', 'Scaled') instead of passive statements ('Worked on', 'Responsible for').",
+        f"Keyword Prominence: Ensure high-priority keywords ({clean_role}, {primary_skills[0] if primary_skills else 'Python'}, {primary_skills[1] if len(primary_skills) > 1 else 'SQL'}) appear prominently in the top 35% of your resume.",
+    ]
+
+    # 4. Tailored Capstone Project Blueprint
+    role_lower = clean_role.lower()
+    if any(k in role_lower for k in ("java", "spring")):
+        project_title = "Enterprise Microservices E-Commerce / Banking Backend"
+        project_desc = "Architect a decoupled microservices application using Spring Boot, Spring Cloud Gateway, Kafka event streams, PostgreSQL, Redis caching, and Docker Compose."
+    elif any(k in role_lower for k in ("python", "data", "ai", "machine learning", "ml")):
+        project_title = "End-to-End AI Analytics & RAG Knowledge Engine"
+        project_desc = "Develop an automated data pipeline and REST API with FastAPI, Vector DB (Chroma/FAISS), PyTorch/Pandas, and an interactive analytics dashboard."
+    elif any(k in role_lower for k in ("frontend", "react", "web", "full stack")):
+        project_title = "Real-Time Collaborative SaaS Platform"
+        project_desc = "Build a responsive web application using React/Next.js, TypeScript, WebSocket state sync, Tailwind CSS, PostgreSQL/MongoDB, and secure JWT auth."
+    elif any(k in role_lower for k in ("cloud", "devops", "sre")):
+        project_title = "Multi-Cloud GitOps Infrastructure & Kubernetes Pipeline"
+        project_desc = "Provision infrastructure using Terraform, automate CI/CD deployments via GitHub Actions, and configure Kubernetes Helm charts with Prometheus/Grafana monitoring."
+    else:
+        project_title = f"Production-Grade {clean_role} Portfolio Capstone"
+        project_desc = f"Build an end-to-end full-lifecycle application showcasing core competencies in {skills_str}, comprehensive testing, and clean modular architecture."
+
+    project_points = [
+        f"Recommended Blueprint: {project_title}.",
+        f"Technical Scope: {project_desc}",
+        "Production Readiness: Include unit tests, Docker containerization, API documentation (Swagger/Postman), and a live deployment link.",
+    ]
+
+    # 5. Interview Readiness & Portfolio Strategy
+    interview_points = [
+        f"Core Technical Rounds: Prepare depth in Data Structures, OOP/System Design, and database query optimization commonly evaluated for {clean_role}.",
+        "GitHub Hygiene: Maintain clear repository READMEs with architectural diagrams, animated demo GIFs, setup instructions, and clean Git commit messages.",
+        "Scenario-Based Questions: Prepare STAR (Situation, Task, Action, Result) stories highlighting technical trade-offs, debugging challenges, and team collaboration.",
+    ]
+
+    structured_suggestions = [
+        {
+            "category": "positioning",
+            "icon": "target",
+            "title": "Target Role & Professional Positioning",
+            "points": positioning_points,
+        },
+        {
+            "category": "skills",
+            "icon": "zap",
+            "title": "High-Priority Technical Skills to Bridge",
+            "points": skills_points,
+        },
+        {
+            "category": "ats",
+            "icon": "file-text",
+            "title": "ATS Optimization & Bullet-Point Formulation",
+            "points": ats_points,
+        },
+        {
+            "category": "project",
+            "icon": "layers",
+            "title": "Recommended Capstone Project Idea",
+            "points": project_points,
+        },
+        {
+            "category": "interview",
+            "icon": "briefcase",
+            "title": "Interview Readiness & Portfolio Strategy",
+            "points": interview_points,
+        },
+    ]
+
+    formatted_lines: list[str] = []
+    for item in structured_suggestions:
+        formatted_lines.append(f"• {item['title']}:")
+        for pt in item["points"]:
+            formatted_lines.append(f"   - {pt}")
+        formatted_lines.append("")
+
+    formatted_text = "\n".join(formatted_lines).strip()
+    return formatted_text, structured_suggestions
 
 
 def _map_analysis_response(raw: dict[str, Any], extracted_text: str) -> dict[str, Any]:
@@ -659,8 +754,8 @@ def _map_analysis_response(raw: dict[str, Any], extracted_text: str) -> dict[str
         recommended_roles = [target_role]
 
     learning_roadmap = _roadmap_strings_to_objects(roadmap_lines)
-    suggestion = _build_suggestion_from_resume(
-        domain, target_role, current_skills, missing_skills, roadmap_lines
+    suggestion_text, structured_suggestions = _generate_structured_ai_suggestions(
+        domain, target_role, ats_score, current_skills, missing_skills, extracted_text
     )
 
     return {
@@ -676,8 +771,9 @@ def _map_analysis_response(raw: dict[str, Any], extracted_text: str) -> dict[str
         "missing_skills": missing_skills,
         "custom_roadmap": roadmap_lines,
         "learning_roadmap": learning_roadmap,
-        "custom_suggestion": suggestion,
-        "career_suggestions": suggestion,
+        "custom_suggestion": suggestion_text,
+        "career_suggestions": suggestion_text,
+        "structured_suggestions": structured_suggestions,
     }
 
 
@@ -1156,6 +1252,7 @@ async def _analyze_impl(file: UploadFile) -> dict[str, Any]:
             "learning_roadmap": roadmap,
             "custom_suggestion": str(ai.get("custom_suggestion") or "").strip(),
             "career_suggestions": str(ai.get("career_suggestions") or ai.get("custom_suggestion") or "").strip(),
+            "structured_suggestions": ai.get("structured_suggestions") or [],
             "keywords": matched[:15],
             "candidate_metadata": details,
             "candidate_name": details.get("candidate_name", "Not found"),
