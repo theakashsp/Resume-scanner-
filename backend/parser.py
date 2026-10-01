@@ -1,25 +1,19 @@
+from __future__ import annotations
+
 import re
 from pdfminer.high_level import extract_text
 from docx import Document
 
-
-# ---------------------------
-# SKILL LIST (customizable)
-# ---------------------------
-SKILLS_DB = [
-    "python", "java", "c", "c++", "javascript",
-    "react", "node", "mongodb", "sql",
-    "aws", "docker", "html", "css",
-    "machine learning", "deep learning",
-    "data analysis", "pandas", "numpy",
-    "tensorflow", "pytorch"
-]
+from skills import (
+    extract_comprehensive_skills,
+    extract_education_details,
+    extract_experience_details,
+    extract_projects_and_activities,
+    detect_domain,
+)
 
 
-# ---------------------------
-# TEXT EXTRACTION
-# ---------------------------
-def normalize_utf8(text):
+def normalize_utf8(text: str) -> str:
     """
     Normalize any parser output into UTF-8-safe text on Windows consoles.
     Replaces unsupported/surrogate chars instead of crashing.
@@ -29,87 +23,39 @@ def normalize_utf8(text):
     return str(text).encode("utf-8", errors="replace").decode("utf-8", errors="replace")
 
 
-def extract_resume_text(file_path):
+def extract_resume_text(file_path: str) -> str:
     if file_path.endswith(".pdf"):
         return normalize_utf8(extract_text(file_path))
-
     elif file_path.endswith(".docx"):
         doc = Document(file_path)
         return normalize_utf8("\n".join([para.text for para in doc.paragraphs]))
-
     else:
         return ""
 
 
-# ---------------------------
-# SKILL EXTRACTION
-# ---------------------------
-def extract_skills(text):
-    text_lower = text.lower()
-    found_skills = []
-
-    for skill in SKILLS_DB:
-        if skill in text_lower:
-            found_skills.append(skill)
-
-    return list(set(found_skills))
-
-
-# ---------------------------
-# EXPERIENCE EXTRACTION
-# ---------------------------
-def extract_experience(text):
+def parse_resume(file_path: str) -> dict:
     """
-    Extract total years of experience using regex
-    Example matches:
-    - 2 years
-    - 3+ years
-    - 5 yrs
+    Comprehensive resume parser returning cleaned text, categorized skills,
+    experience details, education & CGPA/GPA, and projects/activities.
     """
-
-    pattern = r"(\d+)\+?\s*(years|yrs)"
-    matches = re.findall(pattern, text.lower())
-
-    years = [int(match[0]) for match in matches]
-
-    if years:
-        return max(years)
-    else:
-        return 0
-
-
-# ---------------------------
-# EDUCATION EXTRACTION
-# ---------------------------
-def extract_education(text):
-    degrees = ["b.tech", "bachelor", "m.tech", "master", "b.e", "mca", "phd"]
-    text_lower = text.lower()
-
-    found_degrees = []
-
-    for degree in degrees:
-        if degree in text_lower:
-            found_degrees.append(degree)
-
-    return list(set(found_degrees))
-
-
-# ---------------------------
-# MAIN PARSER FUNCTION
-# ---------------------------
-def parse_resume(file_path):
-
     raw_text = extract_resume_text(file_path)
+    cleaned_text = normalize_utf8(raw_text)
 
-    cleaned_text = normalize_utf8(raw_text).lower()
-
-    skills = extract_skills(cleaned_text)
-    experience = extract_experience(cleaned_text)
-    education = extract_education(cleaned_text)
+    skills_data = extract_comprehensive_skills(cleaned_text)
+    education_data = extract_education_details(cleaned_text)
+    experience_data = extract_experience_details(cleaned_text)
+    projects_data = extract_projects_and_activities(cleaned_text)
+    domain = detect_domain(cleaned_text)
 
     return {
         "cleaned_text": cleaned_text,
-        "skills": skills,
-        "experience_years": experience,
-        "education": education
+        "domain": domain,
+        "skills": skills_data["all_skills"],
+        "skills_categorized": skills_data,
+        "experience": experience_data,
+        "experience_years": experience_data["total_years"],
+        "education": education_data,
+        "education_degrees": education_data["all_degrees"],
+        "cgpa": education_data["cgpa_or_gpa"],
+        "projects_and_activities": projects_data,
     }
