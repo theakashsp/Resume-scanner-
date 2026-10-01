@@ -352,22 +352,33 @@ export function generateCareerReportPdf({
   const jobRows = [];
   Object.entries(jobsByRole || {}).forEach(([roleKey, roleJobs]) => {
     (roleJobs || []).forEach((job) => {
-      const url = String(job.redirect_url || job.job_apply_link || '').trim();
-      const hasLink = url && url !== '#';
+      let url = String(job.redirect_url || job.job_apply_link || '').trim();
+      const jobTitle = String(job.job_title || 'Open Role');
+      const company = String(job.company_name || job.employer_name || 'Hiring Company');
+      if (!url || url === '#' || !url.startsWith('http')) {
+        url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(`${jobTitle} ${company}`)}&location=India`;
+      }
+
       jobRows.push([
         roleKey,
-        String(job.company_name || job.employer_name || 'Company'),
-        String(job.job_title || 'Open Role'),
+        company,
+        jobTitle,
         String(job.location || 'India'),
-        hasLink
-          ? { content: 'Apply', link: url, styles: { textColor: COLORS.purple, fontStyle: 'bold', halign: 'center' } }
-          : { content: 'N/A', styles: { textColor: COLORS.muted, halign: 'center' } },
+        {
+          content: 'Apply',
+          link: url,
+          styles: {
+            textColor: [124, 58, 237],
+            fontStyle: 'bold',
+            halign: 'center',
+          },
+        },
       ]);
     });
   });
 
   y = ensureSpace(doc, y, 40);
-  y = drawSectionTitle(doc, y, 'Live Job Openings (India)', 'Click Apply to open the job posting');
+  y = drawSectionTitle(doc, y, 'Live Job Openings (India)', 'Click Apply to open the direct job application portal');
 
   autoTable(doc, {
     startY: y,
@@ -376,7 +387,7 @@ export function generateCareerReportPdf({
     theme: 'grid',
     styles: {
       fontSize: 8,
-      cellPadding: 3,
+      cellPadding: 3.5,
       textColor: COLORS.slate,
       lineColor: [226, 232, 240],
       overflow: 'linebreak',
@@ -391,9 +402,18 @@ export function generateCareerReportPdf({
       1: { cellWidth: 38 },
       2: { cellWidth: 52 },
       3: { cellWidth: 28 },
-      4: { cellWidth: 18 },
+      4: { cellWidth: 18, halign: 'center' },
     },
     margin: { left: 14, right: 14 },
+    didDrawCell: (data) => {
+      if (data.section === 'body' && data.column.index === 4) {
+        const rawCell = data.row.raw[4];
+        const url = (typeof rawCell === 'object' && rawCell !== null) ? rawCell.link : null;
+        if (url && typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+          doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: url });
+        }
+      }
+    },
     didDrawPage: (data) => {
       if (data.pageNumber > 1) {
         drawHeaderBanner(doc);

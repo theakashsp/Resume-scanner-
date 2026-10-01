@@ -6,20 +6,43 @@ import React, { useState, useMemo } from 'react';
 import { MapPin, Briefcase, Building2, ExternalLink, Search, Filter, Sparkles } from 'lucide-react';
 
 function normalizeJob(job) {
+  const role = job.role_category || 'Software Professional';
+  const title = job.job_title || job.title || role;
+  const company = job.company_name || job.employer_name || 'Hiring Company';
+  const location = job.location || 'India';
+
+  let url = String(job.redirect_url || job.job_apply_link || job.link || '').trim();
+  if (!url || url === '#' || !url.startsWith('http')) {
+    url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(`${title} ${company}`)}&location=India`;
+  }
+
+  let portal = job.portal || 'Direct Apply';
+  const lower = url.toLowerCase();
+  if (lower.includes('linkedin')) portal = 'LinkedIn';
+  else if (lower.includes('naukri')) portal = 'Naukri';
+  else if (lower.includes('indeed')) portal = 'Indeed';
+  else if (lower.includes('foundit')) portal = 'Foundit';
+  else if (lower.includes('google')) portal = 'Google Jobs';
+
   return {
-    role_category: job.role_category || '',
-    company_name: job.company_name || job.employer_name || 'Company',
-    job_title: job.job_title || job.title || 'Open Role',
-    location: job.location || 'India',
-    redirect_url: job.redirect_url || job.job_apply_link || job.link || '#',
+    role_category: role,
+    company_name: company,
+    job_title: title,
+    location: location,
+    redirect_url: url,
     job_employment_type: job.job_employment_type || job.type || 'Full-time',
-    portal: job.portal || (job.redirect_url?.includes('linkedin') ? 'LinkedIn' : job.redirect_url?.includes('naukri') ? 'Naukri' : job.redirect_url?.includes('indeed') ? 'Indeed' : job.redirect_url?.includes('foundit') ? 'Foundit' : 'Direct Apply'),
+    portal: portal,
   };
 }
 
 function JobCard({ job, index }) {
   const j = normalizeJob(job);
-  const canApply = j.redirect_url && j.redirect_url !== '#';
+  const [isOpening, setIsOpening] = useState(false);
+
+  const handleApplyClick = () => {
+    setIsOpening(true);
+    setTimeout(() => setIsOpening(false), 2500);
+  };
 
   return (
     <article className="tw-property-card" style={{ animationDelay: `${index * 60}ms` }}>
@@ -46,19 +69,22 @@ function JobCard({ job, index }) {
           {j.location}
         </p>
         <div className="tw-property-card__footer mt-3">
-          {canApply ? (
-            <a
-              className="btn btn-primary tw-btn-primary btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-1"
-              href={j.redirect_url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span>Apply on {j.portal}</span>
-              <ExternalLink size={14} />
-            </a>
-          ) : (
-            <span className="tw-property-card__unavailable">Listing unavailable</span>
-          )}
+          <a
+            className={`btn btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-1 ${isOpening ? 'btn-success' : 'btn-primary tw-btn-primary'}`}
+            href={j.redirect_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleApplyClick}
+          >
+            {isOpening ? (
+              <span>✓ Opening {j.portal}...</span>
+            ) : (
+              <>
+                <span>Apply on {j.portal}</span>
+                <ExternalLink size={14} />
+              </>
+            )}
+          </a>
         </div>
       </div>
     </article>

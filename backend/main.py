@@ -292,7 +292,24 @@ def _job_record(
     redirect_url: str,
     employment_type: str = "Full-time",
 ) -> dict[str, Any]:
-    url = redirect_url or "#"
+    url = (redirect_url or "").strip()
+    if not url or url == "#" or not (url.startswith("http://") or url.startswith("https://")):
+        query = f"{job_title} {company_name} jobs India"
+        url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&ibp=htl;jobs"
+
+    portal = "Direct Apply"
+    lower_url = url.lower()
+    if "linkedin.com" in lower_url:
+        portal = "LinkedIn"
+    elif "naukri.com" in lower_url:
+        portal = "Naukri"
+    elif "indeed.com" in lower_url:
+        portal = "Indeed"
+    elif "foundit.in" in lower_url:
+        portal = "Foundit"
+    elif "google.com" in lower_url:
+        portal = "Google Jobs"
+
     return {
         "role_category": role_category,
         "company_name": company_name,
@@ -302,6 +319,7 @@ def _job_record(
         "employer_name": company_name,
         "job_apply_link": url,
         "job_employment_type": employment_type,
+        "portal": portal,
     }
 
 
