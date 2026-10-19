@@ -282,7 +282,7 @@ FRAMEWORK_PATTERNS: list[tuple[str, re.Pattern, str]] = [
     ("fastapi", re.compile(r"\bfastapi\b", re.IGNORECASE), "FastAPI"),
     ("flask", re.compile(r"\bflask\b", re.IGNORECASE), "Flask"),
     ("nextjs", re.compile(r"\bnext(?:\.js|js)?\b", re.IGNORECASE), "Next.js"),
-    (".net", re.compile(r"\b(?:\.net|dotnet|asp\.net)\b", re.IGNORECASE), ".NET"),
+    (".net", re.compile(r"(?<![a-zA-Z0-9])(?:\.net|dotnet|asp\.net)\b", re.IGNORECASE), ".NET"),
     ("tensorflow", re.compile(r"\btensorflow\b", re.IGNORECASE), "TensorFlow"),
     ("pytorch", re.compile(r"\bpytorch\b", re.IGNORECASE), "PyTorch"),
     ("pandas", re.compile(r"\bpandas\b", re.IGNORECASE), "Pandas"),
@@ -332,14 +332,124 @@ SOFT_SKILL_PATTERNS: list[tuple[str, re.Pattern, str]] = [
     ("analytical thinking", re.compile(r"\b(?:analytical|critical\s+thinking)\b", re.IGNORECASE), "Analytical Thinking"),
 ]
 
+# ==============================================================================
+# NEGATION DETECTION FOR EVIDENCE-BASED SKILL EXTRACTION
+# Prevents false positives from claims like "No practical Kubernetes experience"
+# ==============================================================================
+_NEGATION_PREFIXES = re.compile(
+    r"\b(?:no|not|none|never|lack|lacks|lacking|lacked|without|haven't|hasn't|hadn't|"
+    r"have\s+not|has\s+not|had\s+not|zero|little\s+to\s+no|minimal\s+to\s+no|exclude|excluding|"
+    r"unfamiliar\s+with|no\s+practical|no\s+prior|no\s+hands-on|"
+    r"not\s+experienced\s+(?:in|with)|not\s+familiar\s+with|no\s+experience\s+(?:with|in)|"
+    r"limited\s+to\s+no|no\s+knowledge\s+of|haven't\s+used|have\s+not\s+used)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_negated_match(text: str, match_start: int, window: int = 60) -> bool:
+    """
+    Check if a matched skill term is preceded by a negation indicator within the same clause.
+    """
+    prefix = text[max(0, match_start - window):match_start]
+    clause = re.split(r"[.;\n!?]", prefix)[-1]
+    return bool(_NEGATION_PREFIXES.search(clause))
+
+
+def _has_positive_evidence(pat: re.Pattern, text: str) -> bool:
+    """
+    Returns True only if at least one match of pattern in text is free of negative context.
+    If every mention in the resume is negated, returns False.
+    """
+    matches = list(pat.finditer(text))
+    if not matches:
+        return False
+    return any(not _is_negated_match(text, m.start()) for m in matches)
+
+
+# ==============================================================================
+# DOMAIN-SPECIFIC PROFESSIONAL COMPETENCY PATTERNS
+# Ensures fair skill detection for Non-IT domains (Commerce, Healthcare, Education, etc.)
+# ==============================================================================
+DOMAIN_SPECIFIC_PATTERNS: dict[str, list[tuple[str, re.Pattern, str]]] = {
+    "Commerce & Finance": [
+        ("tally", re.compile(r"\b(?:tally|tally\s*(?:erp|prime|9))\b", re.IGNORECASE), "Tally ERP / Prime"),
+        ("gst", re.compile(r"\b(?:gst|goods\s+and\s+services\s+tax|gst\s+filing)\b", re.IGNORECASE), "GST Compliance"),
+        ("financial modeling", re.compile(r"\bfinancial\s+model(?:ing)?\b", re.IGNORECASE), "Financial Modeling"),
+        ("auditing", re.compile(r"\b(?:audit(?:ing)?|statutory\s+audit|internal\s+audit)\b", re.IGNORECASE), "Auditing Standards"),
+        ("taxation", re.compile(r"\b(?:tax(?:ation)?|direct\s+tax|indirect\s+tax|tds|income\s+tax)\b", re.IGNORECASE), "Taxation & TDS"),
+        ("reconciliation", re.compile(r"\b(?:bank\s+reconciliation|account\s+reconciliation)\b", re.IGNORECASE), "Bank Reconciliation"),
+        ("financial reporting", re.compile(r"\bfinancial\s+report(?:ing|s)?\b", re.IGNORECASE), "Financial Reporting"),
+        ("excel", re.compile(r"\b(?:advanced\s+excel|ms\s*excel|vlookup|pivot\s*tables?)\b", re.IGNORECASE), "Advanced MS Excel"),
+    ],
+    "Healthcare": [
+        ("patient care", re.compile(r"\bpatient\s+care\b", re.IGNORECASE), "Patient Care & Triage"),
+        ("clinical doc", re.compile(r"\bclinical\s+doc(?:umentation)?\b", re.IGNORECASE), "Clinical Documentation"),
+        ("ehr", re.compile(r"\b(?:ehr|emr|electronic\s+health\s+records?)\b", re.IGNORECASE), "Electronic Health Records (EHR)"),
+        ("medical terms", re.compile(r"\bmedical\s+terminolog(?:y|ies)\b", re.IGNORECASE), "Medical Terminology"),
+        ("pharmacology", re.compile(r"\bpharmacol(?:ogy|ogical)\b", re.IGNORECASE), "Pharmacology Basics"),
+        ("infection control", re.compile(r"\binfection\s+control\b", re.IGNORECASE), "Infection Control"),
+        ("vital signs", re.compile(r"\bvital\s+signs?(?:\s+monitoring)?\b", re.IGNORECASE), "Vital Signs Monitoring"),
+    ],
+    "Education": [
+        ("curriculum", re.compile(r"\bcurriculum(?:\s+planning|\s+design)?\b", re.IGNORECASE), "Curriculum Planning"),
+        ("classroom mgmt", re.compile(r"\bclassroom\s+management\b", re.IGNORECASE), "Classroom Management"),
+        ("pedagogy", re.compile(r"\b(?:pedagog(?:y|ical)|lesson\s+planning)\b", re.IGNORECASE), "Pedagogical Delivery"),
+        ("lms", re.compile(r"\b(?:lms|learning\s+management\s+systems?|moodle|canvas)\b", re.IGNORECASE), "EdTech Tools (LMS)"),
+        ("counseling", re.compile(r"\bacademic\s+counsel(?:ing)?\b", re.IGNORECASE), "Academic Counseling"),
+        ("assessment", re.compile(r"\bstudent\s+assessment\b", re.IGNORECASE), "Student Assessment"),
+    ],
+    "Core Engineering": [
+        ("autocad", re.compile(r"\bautocad(?:\s*2d|\s*3d)?\b", re.IGNORECASE), "AutoCAD 2D/3D"),
+        ("solidworks", re.compile(r"\b(?:solidworks|catia|creo|inventor)\b", re.IGNORECASE), "SolidWorks / CATIA"),
+        ("matlab", re.compile(r"\b(?:matlab|simulink)\b", re.IGNORECASE), "MATLAB & Simulink"),
+        ("fea", re.compile(r"\b(?:fea|ansys|finite\s+element)\b", re.IGNORECASE), "Finite Element Analysis (FEA)"),
+        ("six sigma", re.compile(r"\b(?:six\s+sigma|quality\s+control|qc|qa/qc)\b", re.IGNORECASE), "Quality Control (Six Sigma)"),
+        ("root cause", re.compile(r"\broot\s+cause\s+analysis\b|\brca\b", re.IGNORECASE), "Root Cause Analysis"),
+    ],
+    "Marketing & Operations": [
+        ("digital marketing", re.compile(r"\bdigital\s+marketing\b", re.IGNORECASE), "Digital Marketing"),
+        ("seo", re.compile(r"\b(?:seo|search\s+engine\s+optimization)\b", re.IGNORECASE), "SEO & SEM"),
+        ("sem", re.compile(r"\b(?:sem|google\s+ads|ppc)\b", re.IGNORECASE), "Performance Marketing"),
+        ("analytics", re.compile(r"\bgoogle\s+analytics\b|\bga4\b", re.IGNORECASE), "Google Analytics"),
+        ("crm", re.compile(r"\b(?:crm|hubspot|salesforce|zoho\s+crm)\b", re.IGNORECASE), "CRM Management (HubSpot/Salesforce)"),
+        ("content strategy", re.compile(r"\bcontent\s+strateg(?:y|ies)\b", re.IGNORECASE), "Content Strategy"),
+        ("supply chain", re.compile(r"\b(?:supply\s+chain|logistics|inventory\s+management)\b", re.IGNORECASE), "Operations & Supply Chain"),
+    ],
+    "Embedded & Systems Engineering": [
+        ("embedded c", re.compile(r"\bembedded\s+c\b", re.IGNORECASE), "Embedded C"),
+        ("freertos", re.compile(r"\b(?:freertos|rtos)\b", re.IGNORECASE), "FreeRTOS"),
+        ("arm", re.compile(r"\b(?:arm|cortex-m|stm32)\b", re.IGNORECASE), "ARM Architecture"),
+        ("protocols", re.compile(r"\b(?:i2c|spi|uart|can\s+bus)\b", re.IGNORECASE), "I2C / SPI / UART"),
+        ("microcontrollers", re.compile(r"\b(?:microcontrollers?|arduino|esp32|pic|raspberry\s*pi)\b", re.IGNORECASE), "Microcontrollers"),
+        ("device drivers", re.compile(r"\bdevice\s+drivers?\b", re.IGNORECASE), "Device Drivers"),
+    ],
+    "Network Engineering": [
+        ("cisco", re.compile(r"\b(?:cisco|ccna|ccnp)\b", re.IGNORECASE), "Cisco Networking"),
+        ("tcp/ip", re.compile(r"\btcp/ip\b|\bsubnetting\b", re.IGNORECASE), "TCP/IP & Subnetting"),
+        ("routing", re.compile(r"\b(?:routing|switching|bgp|ospf)\b", re.IGNORECASE), "Routing (BGP/OSPF)"),
+        ("wireshark", re.compile(r"\bwireshark\b", re.IGNORECASE), "Wireshark"),
+        ("firewall", re.compile(r"\b(?:firewalls?|palo\s*alto|fortinet|checkpoint)\b", re.IGNORECASE), "Network Firewalls"),
+        ("vlan", re.compile(r"\bvlan(?:s)?\b", re.IGNORECASE), "VLAN Configuration"),
+        ("dns/dhcp", re.compile(r"\b(?:dns|dhcp)\b", re.IGNORECASE), "DNS / DHCP"),
+    ],
+    "Management": [
+        ("project mgmt", re.compile(r"\bproject\s+management\b|\bscrum\b|\bagile\b", re.IGNORECASE), "Project Management (Agile/Scrum)"),
+        ("stakeholder", re.compile(r"\bstakeholder\s+management\b", re.IGNORECASE), "Stakeholder Management"),
+        ("strategic planning", re.compile(r"\bstrategic\s+planning\b", re.IGNORECASE), "Strategic Planning"),
+        ("risk mgmt", re.compile(r"\brisk\s+management\b", re.IGNORECASE), "Risk Management"),
+        ("process opt", re.compile(r"\bprocess\s+optimization\b|\bprocess\s+improvement\b", re.IGNORECASE), "Process Optimization"),
+    ],
+}
+
 
 # ==============================================================================
 # COMPREHENSIVE MULTI-DIMENSIONAL EXTRACTION FUNCTIONS
 # ==============================================================================
 
-def extract_comprehensive_skills(text: str) -> dict[str, Any]:
+def extract_comprehensive_skills(text: str, domain: str | None = None) -> dict[str, Any]:
     """
     Extract all skills cleanly without omitting short or symbol-based skills (C, C++, C#, Java, Python, etc.)
+    Validates evidence and filters out negative claims (e.g. 'no practical experience with X').
     """
     languages: list[str] = []
     frameworks: list[str] = []
@@ -347,6 +457,7 @@ def extract_comprehensive_skills(text: str) -> dict[str, Any]:
     databases: list[str] = []
     tools: list[str] = []
     soft_skills: list[str] = []
+    domain_skills: list[str] = []
     all_matched: list[str] = []
     seen_lower: set[str] = set()
 
@@ -358,28 +469,35 @@ def extract_comprehensive_skills(text: str) -> dict[str, Any]:
             all_matched.append(canonical)
 
     for _, pat, name in LANGUAGE_PATTERNS:
-        if pat.search(text):
+        if _has_positive_evidence(pat, text):
             add_skill(languages, name)
 
     for _, pat, name in FRAMEWORK_PATTERNS:
-        if pat.search(text):
+        if _has_positive_evidence(pat, text):
             add_skill(frameworks, name)
 
     for _, pat, name in CLOUD_DEVOPS_PATTERNS:
-        if pat.search(text):
+        if _has_positive_evidence(pat, text):
             add_skill(cloud_devops, name)
 
     for _, pat, name in DATABASE_PATTERNS:
-        if pat.search(text):
+        if _has_positive_evidence(pat, text):
             add_skill(databases, name)
 
     for _, pat, name in TOOL_PATTERNS:
-        if pat.search(text):
+        if _has_positive_evidence(pat, text):
             add_skill(tools, name)
 
     for _, pat, name in SOFT_SKILL_PATTERNS:
-        if pat.search(text):
+        if _has_positive_evidence(pat, text):
             add_skill(soft_skills, name)
+
+    # Detect domain if not provided
+    active_domain = domain or detect_domain(text)
+    if active_domain in DOMAIN_SPECIFIC_PATTERNS:
+        for _, pat, name in DOMAIN_SPECIFIC_PATTERNS[active_domain]:
+            if _has_positive_evidence(pat, text):
+                add_skill(domain_skills, name)
 
     return {
         "languages": languages,
@@ -388,6 +506,7 @@ def extract_comprehensive_skills(text: str) -> dict[str, Any]:
         "databases": databases,
         "tools": tools,
         "soft_skills": soft_skills,
+        "domain_skills": domain_skills,
         "all_skills": all_matched,
     }
 
@@ -1019,6 +1138,21 @@ _SKILL_KEY_MAP = {
     "java": "java",
 }
 
+_RELATED_SKILL_GROUPS: list[set[str]] = [
+    {"react.js", "next.js", "vue.js", "angular", "javascript", "typescript", "html/css", "node.js"},
+    {"python", "django", "fastapi", "flask"},
+    {"docker", "kubernetes", "terraform", "ansible", "ci/cd", "aws", "azure", "google cloud (gcp)", "linux / shell"},
+    {"postgresql", "mysql", "mongodb", "redis", "oracle db", "sql"},
+    {"java", "spring boot", "microservices"},
+    {"c", "c++", "embedded c", "freertos", "arm architecture"},
+    {"machine learning", "deep learning", "pytorch", "tensorflow", "scikit-learn", "nlp", "computer vision", "pandas", "numpy"},
+    {"tally erp / prime", "gst compliance", "financial reporting", "taxation & tds", "bank reconciliation", "auditing standards"},
+    {"autocad 2d/3d", "solidworks / catia", "matlab & simulink", "finite element analysis (fea)"},
+    {"cisco networking", "tcp/ip & subnetting", "routing (bgp/ospf)", "wireshark", "network firewalls"},
+    {"digital marketing", "seo & sem", "google analytics", "performance marketing"},
+    {"patient care & triage", "clinical documentation", "electronic health records (ehr)", "infection control"},
+]
+
 
 def _skill_normalized_key(skill_name: str) -> str:
     cleaned = re.sub(r"[^a-zA-Z0-9+#/]", "", skill_name.lower().strip())
@@ -1063,6 +1197,238 @@ def merge_recommended_roles(primary: list[str], skill_roles: list[str], limit: i
     return merged
 
 
-def extract_professional_skills(text: str, domain: str) -> list[str]:
-    data = extract_comprehensive_skills(text)
+def extract_professional_skills(text: str, domain: str = "Information Technology") -> list[str]:
+    data = extract_comprehensive_skills(text, domain=domain)
     return data["all_skills"]
+
+
+def evaluate_ats_score(
+    text: str,
+    domain: str = "Information Technology",
+    job_description: str | None = None,
+) -> dict[str, Any]:
+    """
+    Transparent, explainable ATS evaluation engine adhering to 4 distinct concepts:
+    1. General Resume Quality Score (Structure, Readability, Action Impact, Completeness)
+    2. Domain Competency Coverage Score (Evidenced Skills vs Domain/Target Role Benchmark)
+    3. Evidence & Practical Application Score (Projects, Certifications, Experience Evidence)
+    4. Optional Job-Specific Compatibility Score (when job_description is provided)
+
+    Weights:
+    - Without Job Description:
+        * General Quality: 30%
+        * Skill Coverage: 40%
+        * Practical Evidence: 30%
+    - With Job Description:
+        * General Quality: 25%
+        * Skill Coverage: 25%
+        * Practical Evidence: 20%
+        * Job Compatibility: 30%
+    """
+    lower = text.lower()
+
+    # 1. Structural section presence
+    section_map = {
+        "contact_info": bool(re.search(r"@|\b(?:\+91[\-\s]?)?[6-9]\d{9}\b", text)),
+        "summary_objective": bool(re.search(r"\b(summary|objective|profile|about\s+me)\b", lower)),
+        "experience": bool(re.search(r"\b(experience|work\s+history|employment|internship|roles?)\b", lower)),
+        "education": bool(re.search(r"\b(education|academic|b\.tech|b\.e|degree|college|university)\b", lower)),
+        "skills": bool(re.search(r"\b(skills|technical\s+skills|core\s+competencies|technologies)\b", lower)),
+        "projects_certs": bool(re.search(r"\b(projects?|certifications?|certificates?|activities|achievements)\b", lower)),
+    }
+    sections_present = [sec for sec, present in section_map.items() if present]
+    section_score = round((len(sections_present) / len(section_map)) * 100)
+
+    # 2. Action verbs and measurable impact
+    action_verbs = [
+        "led", "designed", "developed", "architected", "deployed", "scaled", "optimized",
+        "managed", "implemented", "built", "spearheaded", "engineered", "collaborated",
+        "created", "achieved", "reduced", "increased", "delivered", "resolved"
+    ]
+    action_hits = sum(1 for v in action_verbs if re.search(rf"\b{v}\b", lower))
+    action_score = min(100, max(30, 40 + action_hits * 6))
+
+    # Metrics detection (numbers, %, $, x times)
+    metric_matches = re.findall(
+        r"\b\d+(?:\.\d+)?%|\b\d+\s*(?:k|m|million|users|clients|requests|transactions)\b|\b\d+\+?\s*(?:years?|months?)\b",
+        lower,
+    )
+    metrics_count = len(metric_matches)
+    metrics_score = min(100, max(35, 45 + metrics_count * 10))
+
+    # General Quality composite (sections 40%, action verbs 30%, metrics/readability 30%)
+    general_quality = round(0.40 * section_score + 0.30 * action_score + 0.30 * metrics_score)
+    general_quality = max(25, min(98, general_quality))
+
+    # 3. Domain Competency Coverage
+    skills_data = extract_comprehensive_skills(text, domain=domain)
+    evidenced_skills = skills_data["all_skills"]
+    profile = DOMAIN_PROFILES.get(domain, DOMAIN_PROFILES["Information Technology"])
+    skill_pool = profile.get("skill_pool", [])
+
+    # Coverage normalized for career depth (freshers/non-tech not penalized)
+    target_benchmark = min(8, len(skill_pool)) if len(skill_pool) > 0 else 6
+    coverage_ratio = len(evidenced_skills) / max(1, target_benchmark)
+    skill_coverage = min(98, max(30, round(35 + coverage_ratio * 60)))
+
+    # 4. Evidence & Practical Application
+    exp_details = extract_experience_details(text)
+    proj_details = extract_projects_and_activities(text)
+
+    practical_evidence = round(
+        0.50 * proj_details["projects_activities_score"] +
+        0.50 * exp_details["experience_score"]
+    )
+    practical_evidence = max(25, min(98, practical_evidence))
+
+    # 5. Job-Specific Compatibility (if job_description provided)
+    job_compatibility = None
+    jd_matched: list[str] = []
+    jd_missing: list[str] = []
+    explicitly_demonstrated: list[str] = []
+    potentially_demonstrated: list[str] = []
+    not_found: list[str] = []
+    required_skills: list[str] = []
+    preferred_skills: list[str] = []
+    jd_analysis: dict[str, Any] | None = None
+
+    if job_description and job_description.strip():
+        jd_skills_data = extract_comprehensive_skills(job_description, domain=domain)
+        jd_skills = jd_skills_data["all_skills"]
+        resume_keys = {_skill_normalized_key(s) for s in evidenced_skills}
+        resume_skills_lower = {s.lower() for s in evidenced_skills}
+
+        jd_lower = job_description.lower()
+        preferred_markers = ("preferred", "plus", "nice to have", "good to have", "bonus", "desired", "advantageous")
+
+        for s in jd_skills:
+            s_low = s.lower()
+            is_pref = False
+            for marker in preferred_markers:
+                idx = jd_lower.find(marker)
+                if idx != -1:
+                    snippet = jd_lower[max(0, idx - 40):min(len(jd_lower), idx + 140)]
+                    if s_low in snippet:
+                        is_pref = True
+                        break
+            if is_pref:
+                preferred_skills.append(s)
+            else:
+                required_skills.append(s)
+
+            if _skill_normalized_key(s) in resume_keys or s_low in resume_skills_lower:
+                explicitly_demonstrated.append(s)
+                jd_matched.append(s)
+            else:
+                is_related = False
+                for group in _RELATED_SKILL_GROUPS:
+                    if s_low in group and any(res_s in group for res_s in resume_skills_lower):
+                        is_related = True
+                        break
+                if is_related:
+                    potentially_demonstrated.append(s)
+                    jd_missing.append(s)
+                else:
+                    not_found.append(s)
+                    jd_missing.append(s)
+
+        jd_exp_match = re.search(r"\b(\d+)\+?\s*(?:-\s*\d+)?\s*years?(?:\s+of)?\s+experience\b", jd_lower)
+        jd_exp_years = int(jd_exp_match.group(1)) if jd_exp_match else None
+        cand_exp_years = exp_details.get("total_years", 0)
+
+        # Token overlap
+        r_tokens = set(re.findall(r"\b[a-zA-Z0-9+#]{2,}\b", lower))
+        j_tokens = set(re.findall(r"\b[a-zA-Z0-9+#]{2,}\b", jd_lower))
+        token_sim = (len(r_tokens & j_tokens) / len(j_tokens)) * 100 if j_tokens else 60.0
+
+        matched_weight = len(explicitly_demonstrated) + 0.45 * len(potentially_demonstrated)
+        skill_match_ratio = matched_weight / max(1, len(jd_skills)) if jd_skills else 0.7
+        job_compatibility = round(0.65 * (skill_match_ratio * 100) + 0.35 * token_sim)
+        job_compatibility = max(20, min(98, job_compatibility))
+
+        jd_analysis = {
+            "matched_requirements": jd_matched,
+            "missing_requirements": jd_missing,
+            "explicitly_demonstrated": explicitly_demonstrated,
+            "potentially_demonstrated": potentially_demonstrated,
+            "not_found": not_found,
+            "required_skills": required_skills,
+            "preferred_skills": preferred_skills,
+            "experience_requirement": f"{jd_exp_years}+ years" if jd_exp_years else "Not strictly specified",
+            "candidate_experience": f"{cand_exp_years} years evidenced" if cand_exp_years else "Entry-level / Early-career",
+            "evidence_note": "A missing mention in the resume is not proof that the candidate lacks the skill.",
+        }
+
+    # Evidence-based explanations
+    evidence_explanations: list[str] = []
+    evidence_explanations.append(
+        f"Detected {len(evidenced_skills)} professional competencies verified from resume text ({', '.join(evidenced_skills[:5]) or 'foundational skills'})."
+    )
+    if action_hits >= 4:
+        evidence_explanations.append(
+            f"Strong action orientation with {action_hits}+ impact verbs highlighting direct engineering and operational contributions."
+        )
+    else:
+        evidence_explanations.append(
+            "Recommendation: Incorporate more active verbs (e.g., 'architected', 'optimized', 'led') to strengthen impact."
+        )
+    if metrics_count >= 2:
+        evidence_explanations.append(
+            f"Quantifiable results identified across {metrics_count} achievements (percentages, timeframes, or scale metrics)."
+        )
+    else:
+        evidence_explanations.append(
+            "Recommendation: Add quantified outcomes (e.g. '% speedup', 'team size', 'volume processed') to bullet points."
+        )
+    if len(sections_present) >= 5:
+        evidence_explanations.append(
+            f"High structural completeness across {len(sections_present)} standard resume sections."
+        )
+    if job_compatibility is not None:
+        evidence_explanations.append(
+            f"Job Alignment: {len(explicitly_demonstrated)} skills explicitly demonstrated, {len(potentially_demonstrated)} related skills requiring review, {len(not_found)} not mentioned."
+        )
+
+    # Compute overall score
+    if job_compatibility is not None:
+        overall = round(
+            0.25 * general_quality +
+            0.25 * skill_coverage +
+            0.20 * practical_evidence +
+            0.30 * job_compatibility
+        )
+        weights = {
+            "general_quality": "25%",
+            "skill_coverage": "25%",
+            "practical_evidence": "20%",
+            "job_compatibility": "30%",
+        }
+    else:
+        overall = round(
+            0.30 * general_quality +
+            0.40 * skill_coverage +
+            0.30 * practical_evidence
+        )
+        weights = {
+            "general_quality": "30%",
+            "skill_coverage": "40%",
+            "practical_evidence": "30%",
+        }
+
+    overall = max(20, min(98, overall))
+
+    return {
+        "overall_ats_score": int(overall),
+        "general_quality_score": int(general_quality),
+        "skill_coverage_score": int(skill_coverage),
+        "practical_evidence_score": int(practical_evidence),
+        "job_compatibility_score": int(job_compatibility) if job_compatibility is not None else None,
+        "evidenced_skills": evidenced_skills,
+        "sections_present": sections_present,
+        "action_verbs_count": action_hits,
+        "metrics_count": metrics_count,
+        "scoring_weights": weights,
+        "evidence_explanations": evidence_explanations,
+        "job_specific_analysis": jd_analysis,
+        "disclaimer": "This score is an internal compatibility estimate based on structural and skill heuristics, not an official ATS score or guarantee of hiring.",
+    }

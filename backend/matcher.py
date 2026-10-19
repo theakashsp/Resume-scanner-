@@ -3,7 +3,7 @@ from __future__ import annotations
 # ==============================================================================
 # TECH STACK: [Matcher & Multi-Dimensional Profile Evaluator]
 # Evaluates Skills, Experience, Education & CGPA, Projects & Other Activities,
-# with semantic / TF-IDF similarity, weighted skill matching, and role mapping.
+# with semantic / TF-IDF similarity, ML role classification, and ATS scoring.
 # ==============================================================================
 import os
 import re
@@ -24,6 +24,7 @@ from skills import (
     extract_projects_and_activities,
     generate_multi_skill_career_tracks,
     calculate_score_breakdown,
+    evaluate_ats_score,
     detect_domain,
 )
 
@@ -66,11 +67,61 @@ SKILL_WEIGHTS = {
     "postgresql": 1.2,
 }
 
+# ==============================================================================
+# TECH STACK: [Scikit-Learn ML Role Model] - Safe Loading & Fallback
+# ==============================================================================
+_ml_role_model: Any = None
+_ml_role_vectorizer: Any = None
+_ml_model_attempted: bool = False
+
+
+def _load_ml_model():
+    global _ml_role_model, _ml_role_vectorizer, _ml_model_attempted
+    if _ml_model_attempted:
+        return _ml_role_model, _ml_role_vectorizer
+    _ml_model_attempted = True
+    try:
+        import joblib
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(base_dir, "role_model.pkl")
+        vec_path = os.path.join(base_dir, "role_vectorizer.pkl")
+        if os.path.isfile(model_path) and os.path.isfile(vec_path):
+            _ml_role_model = joblib.load(model_path)
+            _ml_role_vectorizer = joblib.load(vec_path)
+    except Exception:
+        _ml_role_model = None
+        _ml_role_vectorizer = None
+    return _ml_role_model, _ml_role_vectorizer
+
+
+def predict_role_with_ml(text: str) -> str | None:
+    """
+    Predict job role using the trained TF-IDF Logistic Regression ML model.
+    Returns None safely if model artifacts are missing or unreadable.
+    """
+    model, vectorizer = _load_ml_model()
+    if model is None or vectorizer is None:
+        return None
+    try:
+        cleaned = text.strip()
+        if not cleaned:
+            return None
+        features = vectorizer.transform([cleaned])
+        predicted = model.predict(features)
+        if len(predicted) > 0 and predicted[0]:
+            role = str(predicted[0]).strip()
+            # Validate that predicted role is in valid trained classes
+            if hasattr(model, "classes_") and role in model.classes_:
+                return role
+    except Exception:
+        pass
+    return None
+
 
 def calculate_similarity(resume_text: str, job_description: str) -> float:
     """
     Calculate semantic similarity score (0-100) between resume and job description.
-    Uses SentenceTransformer if available, or token-level Jaccard/TF-IDF similarity.
+    Uses SentenceTransformer if available, or token-level Jaccard similarity.
     """
     if _transformer_model is not None:
         try:
@@ -187,31 +238,30 @@ def generate_learning_roadmap(missing_skills: list[str]) -> list[str]:
     return roadmap
 
 
-def evaluate_full_candidate_profile(resume_text: str) -> dict[str, Any]:
+def evaluate_full_candidate_profile(
+    resume_text: str,
+    job_description: str | None = None,
+) -> dict[str, Any]:
     """
     Comprehensive multi-dimensional evaluator analyzing:
-    1. Skills (all programming languages like C, C++, Java, Python, Web, Cloud, Databases)
+    1. Skills across IT and Non-IT domains
     2. Experience (years, seniority tier, internships)
     3. Education & CGPA/GPA/CPA (degree, grades, academic standing)
     4. Projects & Extracurricular Activities (projects, certifications, hackathons, open source)
     5. Multi-Skill Career Tracks across all strong skill sets
-    6. 4-Pillar Score Breakdown & Overall ATS Score
+    6. Transparent, explainable ATS evaluation breakdown
     """
-    skills_data = extract_comprehensive_skills(resume_text)
+    domain = detect_domain(resume_text)
+    skills_data = extract_comprehensive_skills(resume_text, domain=domain)
     edu_data = extract_education_details(resume_text)
     exp_data = extract_experience_details(resume_text)
     proj_data = extract_projects_and_activities(resume_text)
-    domain = detect_domain(resume_text)
 
-    # Calculate skill score
-    total_skills_count = len(skills_data["all_skills"])
-    skill_score = min(98, max(35, 45 + total_skills_count * 4))
-
-    score_breakdown = calculate_score_breakdown(
-        skills_score=int(skill_score),
-        experience_score=exp_data["experience_score"],
-        education_score=edu_data["education_score"],
-        projects_activities_score=proj_data["projects_activities_score"],
+    # Calculate explainable ATS evaluation
+    ats_evaluation = evaluate_ats_score(
+        resume_text,
+        domain=domain,
+        job_description=job_description,
     )
 
     career_tracks = generate_multi_skill_career_tracks(
@@ -220,6 +270,12 @@ def evaluate_full_candidate_profile(resume_text: str) -> dict[str, Any]:
         domain=domain,
     )
 
+    # Safe ML model prediction
+    ml_pred = predict_role_with_ml(resume_text)
+    recommended_roles = career_tracks["recommended_roles"]
+    if ml_pred and ml_pred not in recommended_roles:
+        recommended_roles = [ml_pred] + recommended_roles
+
     return {
         "domain": domain,
         "skills_data": skills_data,
@@ -227,16 +283,29 @@ def evaluate_full_candidate_profile(resume_text: str) -> dict[str, Any]:
         "experience_data": exp_data,
         "projects_data": proj_data,
         "career_tracks": career_tracks["career_tracks"],
-        "recommended_roles": career_tracks["recommended_roles"],
-        "score_breakdown": score_breakdown,
-        "overall_ats_score": score_breakdown["overall_ats_score"],
+        "recommended_roles": recommended_roles,
+        "ml_predicted_role": ml_pred,
+        "ats_evaluation": ats_evaluation,
+        "score_breakdown": {
+            "overall_ats_score": ats_evaluation["overall_ats_score"],
+            "general_quality_score": ats_evaluation["general_quality_score"],
+            "skill_coverage_score": ats_evaluation["skill_coverage_score"],
+            "practical_evidence_score": ats_evaluation["practical_evidence_score"],
+            "job_compatibility_score": ats_evaluation.get("job_compatibility_score"),
+            "weights": ats_evaluation["scoring_weights"],
+        },
+        "overall_ats_score": ats_evaluation["overall_ats_score"],
     }
 
 
 def predict_job_role(resume_text: str) -> str:
     """
-    Predict primary recommended job role.
+    Predict primary recommended job role using trained ML classifier with fallback
+    to multi-dimensional career tracks evaluator.
     """
+    ml_role = predict_role_with_ml(resume_text)
+    if ml_role:
+        return ml_role
     eval_result = evaluate_full_candidate_profile(resume_text)
     roles = eval_result["recommended_roles"]
     return roles[0] if roles else "Software Developer"

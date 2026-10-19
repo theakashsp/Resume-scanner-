@@ -25,6 +25,7 @@
     "build": "react-scripts build",
     "build:quick": "cross-env GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",
+    "test:ci": "cross-env CI=true react-scripts test --watchAll=false",
     "eject": "react-scripts eject"
   },
   "devDependencies": {

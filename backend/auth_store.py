@@ -1,4 +1,4 @@
-"""Local auth store: register (name/email/password) + password-based sign-in."""
+"""Local auth store: register (name/email/password) + password-based sign-in with brute-force protection."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 import re
 import secrets
 import time
@@ -15,11 +16,21 @@ from pathlib import Path
 from typing import Any
 
 _BACKEND_DIR = Path(__file__).resolve().parent
-_USERS_FILE = _BACKEND_DIR / "users_data.json"
+_DATA_DIR = Path(os.getenv("DATA_DIR", str(_BACKEND_DIR)))
+try:
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    pass
+_USERS_FILE = _DATA_DIR / "users_data.json"
 _SESSION_TTL_SEC = 60 * 60 * 24 * 14  # 14 days
+_MAX_FAILED_ATTEMPTS = 5
+_LOCKOUT_DURATION_SEC = 15 * 60  # 15 minutes lockout
 
 # token -> {email, expires_at}
 _sessions: dict[str, dict[str, Any]] = {}
+
+# email -> {count, first_failed, locked_until}
+_failed_logins: dict[str, dict[str, Any]] = {}
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 
@@ -76,11 +87,11 @@ def register_user(name: str, email: str, password: str, phone: str = "") -> dict
     clean_name = " ".join((name or "").split())
     if len(clean_name) < 2:
         raise ValueError("Full name must be at least 2 characters.")
-    
+
     email_n = normalize_email(email)
 
-    if len(password or "") < 6:
-        raise ValueError("Password must be at least 6 characters.")
+    if len(password or "") < 8:
+        raise ValueError("Password must be at least 8 characters long.")
 
     phone_clean = ""
     if phone and phone.strip():
@@ -109,13 +120,37 @@ def login_user(email: str, password: str) -> dict[str, Any]:
     if not password:
         raise ValueError("Please enter your password.")
 
+    now = time.time()
+    lockout_info = _failed_logins.get(email_n)
+    if lockout_info and lockout_info.get("locked_until", 0) > now:
+        remaining_mins = max(1, int((lockout_info["locked_until"] - now) // 60) + 1)
+        raise ValueError(
+            f"Account temporarily locked due to repeated failed login attempts. Please try again in {remaining_mins} minutes."
+        )
+
     data = _load_users()
     user = data["users"].get(email_n)
+
+    def _record_failure():
+        rec = _failed_logins.get(email_n, {"count": 0, "first_failed": now})
+        if now - rec.get("first_failed", now) > _LOCKOUT_DURATION_SEC:
+            rec = {"count": 1, "first_failed": now}
+        else:
+            rec["count"] = rec.get("count", 0) + 1
+        if rec["count"] >= _MAX_FAILED_ATTEMPTS:
+            rec["locked_until"] = now + _LOCKOUT_DURATION_SEC
+        _failed_logins[email_n] = rec
+
     if not user:
+        _record_failure()
         raise ValueError("Invalid email or password. Please try again.")
 
     if not _verify_password(password, user.get("salt", ""), user.get("password_hash", "")):
+        _record_failure()
         raise ValueError("Invalid email or password. Please try again.")
+
+    # Successful login: reset failed attempts
+    _failed_logins.pop(email_n, None)
 
     token = secrets.token_urlsafe(32)
     _sessions[token] = {"email": email_n, "expires_at": time.time() + _SESSION_TTL_SEC}
@@ -152,3 +187,12 @@ def get_user_by_token(token: str | None) -> dict[str, Any] | None:
 def logout(token: str | None) -> None:
     if token:
         _sessions.pop(token, None)
+
+
+def reset_failed_attempts(email: str) -> None:
+    """Helper for testing or administrative unlock."""
+    try:
+        clean = normalize_email(email)
+        _failed_logins.pop(clean, None)
+    except Exception:
+        pass

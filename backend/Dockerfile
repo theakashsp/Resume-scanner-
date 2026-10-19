@@ -9,7 +9,7 @@ FROM python:3.11-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
-    WORKERS=4 \
+    WORKERS=1 \
     TIMEOUT=120 \
     APP_HOME=/app
 
@@ -35,6 +35,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy backend application source code
 COPY . .
+
+# Pre-train/validate ML model artifacts inside container environment
+RUN python train_role_model.py
 
 # Ensure upload and working directories exist with proper non-root permissions
 RUN mkdir -p uploads && \

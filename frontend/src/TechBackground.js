@@ -12,6 +12,7 @@ export default function TechBackground() {
     if (!canvas) return undefined;
 
     const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
     let animationId;
     let nodes = [];
 

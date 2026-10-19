@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders PathFinder branding', () => {
+test('renders Resume Analyzer branding', () => {
   render(<App />);
-  expect(screen.getAllByText(/PathFinder/i).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/Resume/i).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/Analyzer/i).length).toBeGreaterThan(0);
 });

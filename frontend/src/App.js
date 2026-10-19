@@ -42,6 +42,7 @@ import {
 import LiveJobOpenings from './LiveJobOpenings';
 import SignInPage from './SignInPage';
 import RegisterPage from './RegisterPage';
+import { getApiOrigin } from './authUtils';
 
 // --- [TECH STACK: jsPDF & jspdf-autotable] Career Report Generator ---
 import { generateCareerReportPdf } from './pdfReport';
@@ -59,14 +60,6 @@ const FEATURE_ICONS = {
   globe: Globe,
   shield: Shield,
 };
-
-function getApiOrigin() {
-  const raw = process.env.REACT_APP_API_URL;
-  if (raw != null && String(raw).trim() !== '') {
-    return String(raw).trim().replace(/\/$/, '');
-  }
-  return 'http://127.0.0.1:8000';
-}
 
 function getAnalyzeUrl() {
   return `${getApiOrigin()}/analyze`;

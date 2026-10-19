@@ -215,30 +215,65 @@ npm run start:quick
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| `GET` | `/health` | Service health, Gemini + job provider status |
-| `GET` | `/api/platform-stats` | Analysis counts and platform metrics |
-| `GET` | `/api/features` | Feature list for the landing page |
-| `POST` | `/analyze` | Upload PDF resume (multipart field: `file`) |
-| `POST` | `/api/fetch-jobs` | Fetch live jobs for recommended roles |
+| `GET` | `/health` | Process health, PDF parser status, ML model status, and provider readiness |
+| `GET` | `/ready` | Lightweight Kubernetes/container readiness probe (distinguishes core from optional external APIs) |
+| `GET` | `/api/platform-stats` | Analysis counts, domain metrics, and provider status |
+| `GET` | `/api/features` | Core platform feature catalog |
+| `POST` | `/analyze` | Multipart PDF resume upload with optional `job_description` |
+| `POST` | `/api/fetch-jobs` | Live job listings matching recommended roles |
+| `GET` | `/api/explore-jobs` | Role-based career and job exploration |
+| `POST` | `/api/auth/register` | User registration with PBKDF2 password hashing |
+| `POST` | `/api/auth/login` | Secure authentication with brute-force lockout protection |
+| `GET` | `/api/auth/me` | Bearer token session verification |
+| `POST` | `/api/auth/logout` | Session token revocation |
 
 Interactive docs: `http://127.0.0.1:8000/docs`
+
+---
+
+## Automated Testing
+
+### Backend Test Suite
+Run the 43 automated pytest unit and integration tests:
+
+```bash
+# From workspace root
+backend\venv\Scripts\pytest backend\tests -v
+```
+
+Tests cover:
+- PDF text extraction, signature verification, corrupt/encrypted/scanned document handling
+- Parser fallback from pdfminer.six to pypdf
+- Evidence-based skill extraction with negative context filtering
+- 4-pillar explainable ATS scoring (Quality, Skill Coverage, Practical Evidence, Job Compatibility)
+- 3-tier job description compatibility (Explicitly Demonstrated, Potentially Demonstrated, Not Found)
+- ML model prediction with graceful heuristic fallback
+- Google Gemini structured responses and graceful local NLP fallback on timeout or failure
+- Authentication, token verification, session lifecycle, and brute-force lockout protection
+- Upload security: media type validation, filename path traversal protection, input size bounds
+
+### Frontend Test Suite
+Run Jest unit and component tests:
+
+```bash
+cd frontend
+npm test -- --watchAll=false
+```
 
 ---
 
 ## Analysis Workflow
 
 1. User uploads a PDF resume
-2. Backend extracts text via pdfminer.six / pypdf
-3. Resume validity is checked (rejects non-resume documents)
-4. Gemini analyzes **only** the extracted resume text:
-   - `candidate_domain`
-   - `target_role` (realistic to experience depth)
-   - `current_skills` (explicitly stated in resume)
-   - `missing_skills` (gaps for the target role)
-   - `custom_roadmap` (step-by-step milestones)
-   - `ats_score`
-5. Transient Gemini SSL/network errors are retried (up to 3 times); if still unavailable, local text analysis is used
-6. Live India jobs are fetched per recommended role
+2. Backend extracts text via pdfminer.six / pypdf with fallback
+3. Upload is strictly validated for size, magic signature (`%PDF-`), media type, and corruption
+4. Multi-factor ATS evaluation calculates:
+   - General Resume Quality Score (Structure, impact action verbs, quantified metrics)
+   - Domain Competency Coverage (benchmarked to target industry domain)
+   - Practical Evidence Score (projects, certifications, quantified outcomes)
+   - Job-Specific Compatibility Score (when target JD is provided, with 3-tier requirement breakdown)
+5. If Google Gemini is configured, it executes structured analysis; if unavailable or failing, the local heuristic NLP engine automatically takes over without interrupting the user experience
+6. Live job listings are searched via JSearch/Adzuna (if configured) or direct career portal search links (LinkedIn, Naukri, Indeed) are provided without fabricating fake listings
 7. Results appear on the dashboard; career roadmap and suggestions are included in the downloadable PDF
 
 ---

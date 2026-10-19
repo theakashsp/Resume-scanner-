@@ -44,7 +44,7 @@ import requests
 from dotenv import load_dotenv
 
 # --- [TECH STACK: FastAPI] High-performance Web Framework & Middleware ---
-from fastapi import FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -53,8 +53,20 @@ from google import genai
 from google.genai import types
 from pathlib import Path
 
-# --- [TECH STACK: pdfminer.six & pypdf] Text extraction from PDF documents ---
-from pdf_parser import extract_pdf_text
+# --- [TECH STACK: pdfminer.six & pypdf] Robust text extraction & validation ---
+from pdf_parser import (
+    MAX_PDF_FILE_SIZE_BYTES,
+    CorruptedPDFError,
+    EmptyPDFError,
+    EncryptedPDFError,
+    ExcessivePageCountError,
+    FileSizeLimitExceededError,
+    InvalidPDFSignatureError,
+    PDFProcessingError,
+    ScannedPDFError,
+    extract_pdf_text,
+    extract_pdf_text_from_bytes,
+)
 
 # --- [TECH STACK: Pydantic] Data validation and schema definition ---
 from pydantic import BaseModel, Field
@@ -69,11 +81,15 @@ from skills import (
     _RESUME_SIGNALS,
     compute_missing_skills,
     detect_domain,
+    evaluate_ats_score,
     extract_professional_skills,
     infer_roles_from_skills,
     merge_recommended_roles,
     sanitize_skills,
 )
+
+# --- [TECH STACK: ML Role Matcher & Evaluator] ---
+import matcher
 
 _BACKEND_DIR = Path(__file__).resolve().parent
 load_dotenv(_BACKEND_DIR / ".env")
@@ -138,14 +154,18 @@ def _is_transient_gemini_error(exc: BaseException) -> bool:
     blob = f"{type(exc).__name__} {exc}".lower()
     return any(marker in blob for marker in _TRANSIENT_GEMINI_MARKERS)
 
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-    "http://127.0.0.1:3002",
-]
+_cors_env = os.getenv("CORS_ORIGINS", "").strip()
+if _cors_env:
+    ALLOWED_ORIGINS = [orig.strip() for orig in _cors_env.split(",") if orig.strip()]
+else:
+    ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:3002",
+    ]
 
 # ==============================================================================
 # TECH STACK: [FastAPI] - Application instance, OpenAPI documentation & CORS Middleware
@@ -168,7 +188,13 @@ app.add_middleware(
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-_STATS_FILE = _BACKEND_DIR / "platform_stats.json"
+_DATA_DIR = Path(os.getenv("DATA_DIR", str(_BACKEND_DIR)))
+try:
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    pass
+
+_STATS_FILE = _DATA_DIR / "platform_stats.json"
 _analysis_count = 0
 
 
@@ -258,6 +284,23 @@ GEMINI_RESUME_SCHEMA = {
     "required": ["is_valid_resume"],
 }
 
+class GeminiServiceError(RuntimeError):
+    """Raised when external Gemini service request fails or returns invalid structure."""
+    pass
+
+
+class GeminiAnalysisOutput(BaseModel):
+    is_valid_resume: bool
+    error: str | None = None
+    candidate_domain: str | None = None
+    ats_score: int = Field(default=50, ge=0, le=100)
+    target_role: str | None = None
+    current_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+    custom_roadmap: list[str] = Field(default_factory=list)
+    career_suggestions: str | None = None
+
+
 # ==============================================================================
 # TECH STACK: [Pydantic] - Data Validation & Serialization Models
 # ==============================================================================
@@ -326,11 +369,12 @@ def _job_record(
 def jobs_provider_status() -> dict[str, Any]:
     has_jsearch = _is_real_key(RAPIDAPI_KEY)
     has_adzuna = _is_real_key(ADZUNA_APP_ID) and _is_real_key(ADZUNA_APP_KEY)
+    any_prov = has_jsearch or has_adzuna
     return {
         "jsearch_configured": has_jsearch,
         "adzuna_configured": has_adzuna,
-        "any_provider": True,
-        "provider_name": "JSearch" if has_jsearch else ("Adzuna" if has_adzuna else "India Career Network (LinkedIn, Naukri, Indeed, Foundit)"),
+        "any_provider": any_prov,
+        "provider_name": "JSearch" if has_jsearch else ("Adzuna" if has_adzuna else "Not configured (Live APIs require RAPIDAPI_KEY or ADZUNA credentials)"),
     }
 
 
@@ -341,84 +385,37 @@ def ai_provider_status() -> dict[str, Any]:
     }
 
 
-def _generate_curated_india_jobs(role_category: str, limit: int = 4) -> list[dict[str, Any]]:
+def get_direct_portal_search_links(role_category: str) -> list[dict[str, str]]:
     role_clean = role_category.strip() or "Software Engineer"
     slug = re.sub(r"[^a-z0-9]+", "-", role_clean.lower()).strip("-")
     encoded_role = urllib.parse.quote(role_clean)
-
-    hubs = [
-        "Bengaluru, Karnataka, India",
-        "Hyderabad, Telangana, India",
-        "Pune, Maharashtra, India",
-        "Gurugram, Delhi NCR, India",
-        "Mumbai, Maharashtra, India",
-        "Chennai, Tamil Nadu, India",
-        "Noida, Uttar Pradesh, India",
-        "Remote, India",
+    return [
+        {
+            "portal": "LinkedIn",
+            "url": f"https://www.linkedin.com/jobs/search/?keywords={encoded_role}&location=India",
+            "label": f"Search '{role_clean}' on LinkedIn India",
+        },
+        {
+            "portal": "Naukri",
+            "url": f"https://www.naukri.com/{slug}-jobs-in-india",
+            "label": f"Search '{role_clean}' on Naukri.com",
+        },
+        {
+            "portal": "Indeed",
+            "url": f"https://in.indeed.com/jobs?q={encoded_role}&l=India",
+            "label": f"Search '{role_clean}' on Indeed India",
+        },
+        {
+            "portal": "Foundit",
+            "url": f"https://www.foundit.in/srp/results?query={encoded_role}&locations=India",
+            "label": f"Search '{role_clean}' on Foundit",
+        },
+        {
+            "portal": "Google Jobs",
+            "url": f"https://www.google.com/search?q={urllib.parse.quote(role_clean + ' jobs India')}&ibp=htl;jobs",
+            "label": f"Search '{role_clean}' on Google Jobs",
+        },
     ]
-
-    companies = [
-        ("Tata Consultancy Services", "TCS"),
-        ("Infosys Technologies", "Infosys"),
-        ("Wipro Limited", "Wipro"),
-        ("Accenture India", "Accenture"),
-        ("Cognizant Technology Solutions", "Cognizant"),
-        ("HCLTech India", "HCLTech"),
-        ("Amazon Development Center", "Amazon"),
-        ("Microsoft India R&D", "Microsoft"),
-        ("Razorpay Software", "Razorpay"),
-        ("Flipkart Internet", "Flipkart"),
-        ("Deloitte India", "Deloitte"),
-        ("Capgemini India", "Capgemini"),
-        ("Swiggy (Bundl Technologies)", "Swiggy"),
-        ("Zomato Limited", "Zomato"),
-        ("Jio Platforms", "Jio"),
-    ]
-
-    titles_variants = [
-        role_clean,
-        f"Associate {role_clean}",
-        f"Junior {role_clean}",
-        f"{role_clean} - Core Platform",
-        f"Staff {role_clean}",
-        f"{role_clean} (Immediate Joiner)",
-    ]
-
-    apply_portals = [
-        ("LinkedIn", f"https://www.linkedin.com/jobs/search/?keywords={encoded_role}&location=India"),
-        ("Naukri", f"https://www.naukri.com/{slug}-jobs-in-india"),
-        ("Indeed", f"https://in.indeed.com/jobs?q={encoded_role}&l=India"),
-        ("Foundit", f"https://www.foundit.in/srp/results?query={encoded_role}&locations=India"),
-        ("Google Jobs", f"https://www.google.com/search?q={urllib.parse.quote(role_clean + ' jobs India')}&ibp=htl;jobs"),
-    ]
-
-    seed = sum(ord(c) for c in role_clean)
-    jobs: list[dict[str, Any]] = []
-    for i in range(limit):
-        comp_idx = (seed + i * 3) % len(companies)
-        hub_idx = (seed + i * 2) % len(hubs)
-        title_idx = (seed + i) % len(titles_variants)
-        portal_idx = (seed + i) % len(apply_portals)
-
-        comp_name, comp_short = companies[comp_idx]
-        loc = hubs[hub_idx]
-        title = titles_variants[title_idx]
-        portal_name, portal_url = apply_portals[portal_idx]
-
-        emp_type = "Internship" if "intern" in role_clean.lower() else "Full-time"
-
-        jobs.append({
-            "role_category": role_clean,
-            "company_name": comp_name,
-            "job_title": title,
-            "location": loc,
-            "redirect_url": portal_url,
-            "employer_name": comp_short,
-            "job_apply_link": portal_url,
-            "job_employment_type": emp_type,
-            "portal": portal_name,
-        })
-    return jobs
 
 
 # ==============================================================================
@@ -442,25 +439,41 @@ def fetch_jsearch_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[d
                 "num_pages": "1",
                 "country": "in",
             },
-            timeout=JOB_API_TIMEOUT,
+            timeout=(5, 15),
         )
+        if r.status_code == 429:
+            _log(f"[JSearch] Rate limit exceeded (429) for '{role_category}'")
+            return []
         r.raise_for_status()
+        seen_keys: set[str] = set()
         for j in (r.json().get("data") or []):
             if len(out) >= limit:
                 break
+            apply_link = (j.get("job_apply_link") or j.get("job_google_link") or "").strip()
+            if not apply_link or not (apply_link.startswith("http://") or apply_link.startswith("https://")):
+                continue
+            comp = (j.get("employer_name") or "Hiring Company").strip()
+            title = (j.get("job_title") or role_category).strip()
+            dedup_key = f"{comp.lower()}::{title.lower()}"
+            if dedup_key in seen_keys:
+                continue
+            seen_keys.add(dedup_key)
+
             city = j.get("job_city") or ""
             country = j.get("job_country") or "India"
             loc = ", ".join(x for x in [city, country] if x) or "India"
             out.append(
                 _job_record(
                     role_category=role_category,
-                    company_name=j.get("employer_name") or "Hiring Company",
-                    job_title=j.get("job_title") or role_category,
+                    company_name=comp,
+                    job_title=title,
                     location=loc,
-                    redirect_url=j.get("job_apply_link") or j.get("job_google_link") or "#",
+                    redirect_url=apply_link,
                     employment_type=j.get("job_employment_type") or "Full-time",
                 )
             )
+    except requests.exceptions.Timeout:
+        _log(f"[JSearch] Request timed out for role: {role_category}")
     except Exception as exc:
         _log(f"[JSearch] {type(exc).__name__}: {exc!r}")
     return out[:limit]
@@ -482,25 +495,40 @@ def fetch_adzuna_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[di
                 "what": role_category,
                 "results_per_page": limit,
             },
-            timeout=JOB_API_TIMEOUT,
+            timeout=(5, 15),
         )
+        if r.status_code == 429:
+            _log(f"[Adzuna] Rate limit exceeded (429) for '{role_category}'")
+            return []
         r.raise_for_status()
+        seen_keys: set[str] = set()
         for j in (r.json().get("results") or []):
             if len(out) >= limit:
                 break
-            company = (j.get("company") or {}).get("display_name") or "Hiring Company"
+            apply_link = (j.get("redirect_url") or "").strip()
+            if not apply_link or not (apply_link.startswith("http://") or apply_link.startswith("https://")):
+                continue
+            comp = ((j.get("company") or {}).get("display_name") or "Hiring Company").strip()
+            title = (j.get("title") or role_category).strip()
+            dedup_key = f"{comp.lower()}::{title.lower()}"
+            if dedup_key in seen_keys:
+                continue
+            seen_keys.add(dedup_key)
+
             loc_obj = j.get("location") or {}
             loc = loc_obj.get("display_name") or "India"
             out.append(
                 _job_record(
                     role_category=role_category,
-                    company_name=company,
-                    job_title=j.get("title") or role_category,
+                    company_name=comp,
+                    job_title=title,
                     location=loc,
-                    redirect_url=j.get("redirect_url") or "#",
+                    redirect_url=apply_link,
                     employment_type=j.get("contract_type") or "Full-time",
                 )
             )
+    except requests.exceptions.Timeout:
+        _log(f"[Adzuna] Request timed out for role: {role_category}")
     except Exception as exc:
         _log(f"[Adzuna] {type(exc).__name__}: {exc!r}")
     return out[:limit]
@@ -516,24 +544,17 @@ def fetch_india_jobs_for_role(role_category: str, limit: int = JOBS_PER_ROLE) ->
                 pool.submit(fetch_adzuna_jobs, role_category, limit),
             ]
             for future in as_completed(futures):
-                for job in future.result():
-                    url = job.get("redirect_url") or ""
-                    if url in seen or url == "#":
-                        continue
-                    seen.add(url)
-                    merged.append(job)
-                    if len(merged) >= limit:
-                        return merged[:limit]
-
-    if len(merged) < limit:
-        curated = _generate_curated_india_jobs(role_category, limit=limit)
-        for job in curated:
-            url = job.get("redirect_url") or ""
-            if url not in seen and url != "#":
-                seen.add(url)
-                merged.append(job)
-            if len(merged) >= limit:
-                break
+                try:
+                    for job in future.result():
+                        url = job.get("redirect_url") or ""
+                        if url in seen or url == "#":
+                            continue
+                        seen.add(url)
+                        merged.append(job)
+                        if len(merged) >= limit:
+                            return merged[:limit]
+                except Exception as exc:
+                    _log(f"[fetch_jobs] provider execution error: {type(exc).__name__}: {exc!r}")
 
     return merged[:limit]
 
@@ -795,7 +816,7 @@ def _map_analysis_response(raw: dict[str, Any], extracted_text: str) -> dict[str
     }
 
 
-def _build_text_only_analysis(extracted_text: str) -> dict[str, Any]:
+def _build_text_only_analysis(extracted_text: str, job_description: str | None = None) -> dict[str, Any]:
     if not _heuristic_is_resume(extracted_text):
         return {"error": INVALID_RESUME_ERROR}
 
@@ -805,26 +826,32 @@ def _build_text_only_analysis(extracted_text: str) -> dict[str, Any]:
     profile = DOMAIN_PROFILES[domain]
     roles = list(profile["roles"])
     metadata = _extract_candidate_details(text)
-    current_skills = sanitize_skills(extract_professional_skills(text, domain), metadata)
 
-    role_scores: list[tuple[str, int]] = []
-    for role in roles:
-        role_tokens = [t for t in re.findall(r"[a-z]+", role.lower()) if len(t) > 3]
-        depth = sum(1 for t in role_tokens if t in lower)
-        depth += sum(1 for skill in current_skills if any(tok in skill.lower() for tok in role_tokens))
-        role_scores.append((role, depth))
-    role_scores.sort(key=lambda item: item[1], reverse=True)
-    target_role = role_scores[0][0] if role_scores else "Graduate Trainee"
+    # Explainable multi-factor ATS evaluation
+    ats_eval = evaluate_ats_score(text, domain=domain, job_description=job_description)
+    ats_score = ats_eval["overall_ats_score"]
+    current_skills = sanitize_skills(ats_eval["evidenced_skills"], metadata)
 
-    if any(k in lower for k in ("fresher", "intern", "trainee", "student", "graduate", "pursuing")):
-        entry_roles = [r for r in roles if any(k in r.lower() for k in ("intern", "trainee", "junior", "associate", "graduate"))]
-        if entry_roles:
-            target_role = entry_roles[0]
+    # ML role classification with heuristic fallback
+    ml_role = matcher.predict_role_with_ml(text)
+    if ml_role:
+        target_role = ml_role
+    else:
+        role_scores: list[tuple[str, int]] = []
+        for role in roles:
+            role_tokens = [t for t in re.findall(r"[a-z]+", role.lower()) if len(t) > 3]
+            depth = sum(1 for t in role_tokens if t in lower)
+            depth += sum(1 for skill in current_skills if any(tok in skill.lower() for tok in role_tokens))
+            role_scores.append((role, depth))
+        role_scores.sort(key=lambda item: item[1], reverse=True)
+        target_role = role_scores[0][0] if role_scores else "Graduate Trainee"
+
+        if any(k in lower for k in ("fresher", "intern", "trainee", "student", "graduate", "pursuing")):
+            entry_roles = [r for r in roles if any(k in r.lower() for k in ("intern", "trainee", "junior", "associate", "graduate"))]
+            if entry_roles:
+                target_role = entry_roles[0]
 
     missing_skills = compute_missing_skills(current_skills, domain)
-    skill_pool = list(profile["skill_pool"])
-    coverage = len(current_skills) / max(1, len(skill_pool))
-    ats_score = int(max(20, min(88, round(28 + coverage * 55))))
 
     roadmap_lines: list[str] = []
     if missing_skills:
@@ -858,6 +885,21 @@ def _build_text_only_analysis(extracted_text: str) -> dict[str, Any]:
     }
     mapped = _map_analysis_response(payload, text)
     mapped["_source"] = "heuristic"
+    mapped["scoring_breakdown"] = {
+        "overall_ats_score": ats_eval["overall_ats_score"],
+        "general_quality_score": ats_eval["general_quality_score"],
+        "skill_coverage_score": ats_eval["skill_coverage_score"],
+        "practical_evidence_score": ats_eval["practical_evidence_score"],
+        "job_compatibility_score": ats_eval.get("job_compatibility_score"),
+        "weights": ats_eval["scoring_weights"],
+    }
+    mapped["evidence_explanations"] = ats_eval["evidence_explanations"]
+    mapped["scoring_weights"] = ats_eval["scoring_weights"]
+    mapped["disclaimer"] = ats_eval["disclaimer"]
+    if ats_eval.get("job_specific_analysis"):
+        mapped["job_specific_analysis"] = ats_eval["job_specific_analysis"]
+    if ml_role:
+        mapped["ml_predicted_role"] = ml_role
     return mapped
 
 
@@ -923,38 +965,55 @@ Return ONLY valid JSON matching this schema:
             )
             cleaned = _strip_llm_json(response.text or "")
             parsed = json.loads(cleaned)
-            mapped = _map_analysis_response(parsed, bounded_text)
+            # Validate output using stable Pydantic schema
+            validated = GeminiAnalysisOutput.model_validate(parsed)
+            mapped = _map_analysis_response(validated.model_dump(), bounded_text)
             if mapped.get("error"):
                 return mapped
             mapped["_source"] = "gemini"
             return mapped
         except json.JSONDecodeError as e:
             _log(f"[Gemini] JSONDecodeError: {e!r}")
-            raise HTTPException(status_code=502, detail="Gemini returned unparsable JSON.")
+            raise GeminiServiceError(f"Gemini returned unparsable JSON: {e!r}") from e
         except Exception as e:
             last_error = e
             _log(f"[Gemini] attempt {attempt}/3 {type(e).__name__}: {e!r}")
             if _is_transient_gemini_error(e) and attempt < 3:
-                time.sleep(1.5 * attempt)
+                time.sleep(min(8.0, 1.5 * (2 ** (attempt - 1))))
                 continue
             break
 
     safe_detail = str(last_error or "unknown error").encode("ascii", "backslashreplace").decode("ascii")
-    if last_error is not None and _is_transient_gemini_error(last_error):
-        raise ConnectionError(f"Gemini transient failure: {safe_detail[:500]}")
-    raise HTTPException(status_code=502, detail=f"Gemini analysis failed: {safe_detail[:500]}")
+    raise GeminiServiceError(f"Gemini analysis failed: {safe_detail[:500]}")
 
 
-def analyze_resume(extracted_text: str) -> dict[str, Any]:
+def analyze_resume(extracted_text: str, job_description: str | None = None) -> dict[str, Any]:
     text = _normalize_resume_text(extracted_text)
     if _genai_client is not None:
         try:
-            return analyze_resume_with_gemini(text)
-        except HTTPException:
-            raise
+            gemini_res = analyze_resume_with_gemini(text)
+            if gemini_res.get("error"):
+                return gemini_res
+
+            domain = gemini_res.get("candidate_domain") or detect_domain(text)
+            ats_eval = evaluate_ats_score(text, domain=domain, job_description=job_description)
+            gemini_res["scoring_breakdown"] = {
+                "overall_ats_score": gemini_res.get("ats_score", ats_eval["overall_ats_score"]),
+                "general_quality_score": ats_eval["general_quality_score"],
+                "skill_coverage_score": ats_eval["skill_coverage_score"],
+                "practical_evidence_score": ats_eval["practical_evidence_score"],
+                "job_compatibility_score": ats_eval.get("job_compatibility_score"),
+                "weights": ats_eval["scoring_weights"],
+            }
+            gemini_res["evidence_explanations"] = ats_eval["evidence_explanations"]
+            gemini_res["scoring_weights"] = ats_eval["scoring_weights"]
+            gemini_res["disclaimer"] = ats_eval["disclaimer"]
+            if ats_eval.get("job_specific_analysis"):
+                gemini_res["job_specific_analysis"] = ats_eval["job_specific_analysis"]
+            return gemini_res
         except Exception as exc:
-            _log(f"[analyze] Gemini unavailable, using text-only analyzer: {exc!r}")
-    return _build_text_only_analysis(text)
+            _log(f"[analyze] External Gemini service unavailable ({type(exc).__name__}: {exc}), cleanly falling back to local heuristic analyzer.")
+    return _build_text_only_analysis(text, job_description=job_description)
 
 
 _LOCATION_MARKERS = (
@@ -1067,13 +1126,25 @@ def _build_jobs_payload(recommended_roles: list[str]) -> dict[str, Any]:
     provider = jobs_provider_status()
     message = None
     if total == 0:
-        message = "No active India listings found for your roles right now. Try again shortly."
+        if not provider["any_provider"]:
+            message = (
+                "Live job search APIs (JSearch / Adzuna) are not configured. "
+                "Explore live openings directly on LinkedIn, Naukri, or Indeed using verified portal search links."
+            )
+        else:
+            message = "No active India openings found matching your recommended roles right now. Try checking job portals directly."
+
+    portal_links: dict[str, list[dict[str, str]]] = {}
+    for r in recommended_roles:
+        portal_links[r] = get_direct_portal_search_links(r)
+
     return {
         "jobs_by_role": jobs_by_role,
         "jobs": jobs_by_role.get(recommended_roles[0], []) if recommended_roles else [],
         "jobs_count": total,
         "jobs_provider": provider,
         "jobs_message": message,
+        "portal_search_links": portal_links,
     }
 
 
@@ -1083,6 +1154,7 @@ def root():
         "service": "Resume Analyzer",
         "tagline": "Career Intelligence Platform",
         "health": "/health",
+        "ready": "/ready",
         "stats": "/api/platform-stats",
         "features": "/api/features",
         "analyze": "POST /analyze",
@@ -1168,18 +1240,46 @@ def auth_logout(authorization: str | None = Header(default=None)):
 
 @app.get("/health")
 def health():
+    ml_model, _ = matcher._load_ml_model()
     return {
         "status": "ok",
         "service": "Resume Analyzer",
-        "version": "4.1",
+        "version": "4.2",
+        "parser_status": {
+            "pdfminer_ready": True,
+            "pypdf_ready": True,
+            "max_file_size_mb": MAX_PDF_FILE_SIZE_BYTES // (1024 * 1024),
+        },
+        "ml_model_status": {
+            "loaded": ml_model is not None,
+            "classes": list(ml_model.classes_) if ml_model is not None and hasattr(ml_model, "classes_") else [],
+        },
         "jobs_provider": jobs_provider_status(),
         "ai_provider": ai_provider_status(),
     }
 
 
+@app.get("/ready")
+@app.get("/api/ready")
+def readiness():
+    ml_model, _ = matcher._load_ml_model()
+    return {
+        "status": "ready",
+        "core_service": "ok",
+        "parser_ready": True,
+        "local_nlp_engine": "ready",
+        "ml_model_loaded": ml_model is not None,
+        "optional_integrations": {
+            "gemini_ai": "configured" if _genai_client is not None else "unconfigured_using_local_fallback",
+            "jsearch_jobs": "configured" if _is_real_key(RAPIDAPI_KEY) else "unconfigured",
+            "adzuna_jobs": "configured" if (_is_real_key(ADZUNA_APP_ID) and _is_real_key(ADZUNA_APP_KEY)) else "unconfigured",
+        },
+    }
+
+
 @app.get("/analyze")
 def analyze_get_info():
-    return {"detail": "Use POST with multipart form field 'file' (PDF).", "field": "file"}
+    return {"detail": "Use POST with multipart form field 'file' (PDF) and optional 'job_description'.", "field": "file"}
 
 
 @app.get("/api/analyze")
@@ -1196,24 +1296,71 @@ def api_fetch_jobs(body: FetchJobsRequest):
     return {"recommended_roles": roles, **payload}
 
 
-async def _analyze_impl(file: UploadFile) -> dict[str, Any]:
-    fname = (file.filename or "").lower()
-    if not fname.endswith(".pdf"):
+async def _analyze_impl(file: UploadFile, job_description: str | None = None) -> dict[str, Any]:
+    # Prevent path traversal and sanitize filename
+    clean_fname = Path(file.filename or "").name.lower()
+    if not clean_fname.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF uploads are supported.")
-    internal = f"{uuid.uuid4().hex}.pdf"
-    path = os.path.join(UPLOAD_DIR, internal)
+
+    # Validate media type if provided
+    valid_content_types = {
+        "application/pdf",
+        "application/x-pdf",
+        "application/acrobat",
+        "applications/vnd.pdf",
+        "text/pdf",
+        "application/octet-stream",
+        "binary/octet-stream",
+    }
+    if file.content_type and file.content_type.lower() not in valid_content_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file content-type '{file.content_type}'. Expected PDF document.",
+        )
+
+    # Validate job description input length
+    if job_description and len(job_description) > 25000:
+        raise HTTPException(
+            status_code=400,
+            detail="Job description exceeds maximum allowed length (25,000 characters).",
+        )
+
+    # Read bytes into memory with size boundary enforcement to protect against memory exhaustion
     try:
-        with open(path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        data = await file.read(MAX_PDF_FILE_SIZE_BYTES + 1)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read upload stream: {type(e).__name__}")
 
-        try:
-            text = _normalize_resume_text(extract_pdf_text(path))
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"PDF read error: {type(e).__name__}")
-        if not text:
-            return JSONResponse(status_code=422, content={"error": INVALID_PDF_TEXT_ERROR})
+    if len(data) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty (0 bytes).")
+    if len(data) > MAX_PDF_FILE_SIZE_BYTES:
+        mb_limit = MAX_PDF_FILE_SIZE_BYTES // (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"File exceeds maximum allowed size ({mb_limit}MB).")
 
-        ai = analyze_resume(text)
+    # Safe PDF parsing with independent fallback & explicit error categorization
+    try:
+        text = _normalize_resume_text(extract_pdf_text_from_bytes(data))
+    except EmptyPDFError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except InvalidPDFSignatureError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ExcessivePageCountError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except EncryptedPDFError as e:
+        return JSONResponse(status_code=422, content={"error": str(e), "code": "ENCRYPTED_PDF"})
+    except ScannedPDFError as e:
+        return JSONResponse(status_code=422, content={"error": str(e), "code": "SCANNED_PDF"})
+    except (CorruptedPDFError, PDFProcessingError) as e:
+        return JSONResponse(status_code=422, content={"error": str(e), "code": "CORRUPTED_PDF"})
+    except Exception as e:
+        _log(f"[parse] PDF extraction error: {type(e).__name__}: {e!r}")
+        return JSONResponse(status_code=422, content={"error": INVALID_PDF_TEXT_ERROR, "code": "UNREADABLE_PDF"})
+
+    if not text:
+        return JSONResponse(status_code=422, content={"error": INVALID_PDF_TEXT_ERROR, "code": "EMPTY_EXTRACTED_TEXT"})
+
+    try:
+        ai = analyze_resume(text, job_description=job_description)
         if ai.get("error"):
             return JSONResponse(
                 status_code=422,
@@ -1256,6 +1403,9 @@ async def _analyze_impl(file: UploadFile) -> dict[str, Any]:
         jobs_payload = _build_jobs_payload(recommended_roles)
         _increment_analysis_count()
 
+        # Privacy-conscious logging: log only non-sensitive operational metrics
+        _log(f"[analyze] Successfully analyzed resume: {len(text)} chars, domain={domain}, target_role={role}, source={ai.get('_source')}")
+
         return {
             "ats_score": ats,
             "predicted_role": role,
@@ -1271,6 +1421,13 @@ async def _analyze_impl(file: UploadFile) -> dict[str, Any]:
             "custom_suggestion": str(ai.get("custom_suggestion") or "").strip(),
             "career_suggestions": str(ai.get("career_suggestions") or ai.get("custom_suggestion") or "").strip(),
             "structured_suggestions": ai.get("structured_suggestions") or [],
+            "scoring_breakdown": ai.get("scoring_breakdown"),
+            "evidence_explanations": ai.get("evidence_explanations") or [],
+            "scoring_weights": ai.get("scoring_weights") or {},
+            "job_specific_analysis": ai.get("job_specific_analysis"),
+            "disclaimer": ai.get("disclaimer"),
+            "ml_predicted_role": ai.get("ml_predicted_role"),
+            "analysis_source": ai.get("_source", "heuristic"),
             "keywords": matched[:15],
             "candidate_metadata": details,
             "candidate_name": details.get("candidate_name", "Not found"),
@@ -1288,22 +1445,22 @@ async def _analyze_impl(file: UploadFile) -> dict[str, Any]:
             status_code=500,
             detail=safe_detail[:800] if safe_detail else f"Analysis failed: {type(e).__name__}",
         )
-    finally:
-        if os.path.isfile(path):
-            try:
-                os.remove(path)
-            except OSError:
-                pass
 
 
 @app.post("/analyze")
-async def analyze(file: UploadFile = File(..., description="PDF resume")):
-    return await _analyze_impl(file)
+async def analyze(
+    file: UploadFile = File(..., description="PDF resume"),
+    job_description: str | None = Form(default=None, description="Optional target job description"),
+):
+    return await _analyze_impl(file, job_description=job_description)
 
 
 @app.post("/api/analyze")
-async def analyze_compat(file: UploadFile = File(..., description="PDF resume")):
-    return await _analyze_impl(file)
+async def analyze_compat(
+    file: UploadFile = File(..., description="PDF resume"),
+    job_description: str | None = Form(default=None, description="Optional target job description"),
+):
+    return await _analyze_impl(file, job_description=job_description)
 
 
 _provider = jobs_provider_status()
@@ -1316,4 +1473,6 @@ if not _provider["any_provider"]:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", "8000"))
+    reload = os.getenv("ENVIRONMENT", "development").lower() == "development"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=reload)
