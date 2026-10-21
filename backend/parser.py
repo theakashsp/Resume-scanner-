@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import re
 from pdfminer.high_level import extract_text
-from docx import Document
+
+try:
+    from docx import Document
+except ImportError:
+    Document = None
 
 from skills import (
     extract_comprehensive_skills,

@@ -22,8 +22,8 @@
     "start": "react-scripts start",
     "start:fast": "cross-env DISABLE_ESLINT_PLUGIN=true GENERATE_SOURCEMAP=false BROWSER=none react-scripts start",
     "start:quick": "serve -s build -l 3000",
-    "build": "react-scripts build",
-    "build:quick": "cross-env GENERATE_SOURCEMAP=false react-scripts build",
+    "build": "cross-env CI=false react-scripts build",
+    "build:quick": "cross-env CI=false GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",
     "test:ci": "cross-env CI=true react-scripts test --watchAll=false",
     "eject": "react-scripts eject"

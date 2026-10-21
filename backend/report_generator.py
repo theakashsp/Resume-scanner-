@@ -1,4 +1,9 @@
-from fpdf import FPDF
+try:
+    from fpdf import FPDF
+except ImportError:
+    class FPDF:  # type: ignore
+        pass
+
 from datetime import datetime
 
 
