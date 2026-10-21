@@ -1,11 +1,11 @@
 {
-  "name": "resume-scanner-platform",
+  "name": "resume-scanner-monorepo",
   "version": "1.0.0",
   "private": true,
   "description": "Resume Scanner and ATS Intelligence Platform",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
-    "start": "cd frontend && npm start",
-    "test": "cd frontend && npm test -- --watchAll=false"
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "start": "npm --prefix frontend start",
+    "test": "npm --prefix frontend test -- --watchAll=false"
   }
 }
