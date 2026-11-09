@@ -1,9 +1,22 @@
 // ==============================================================================
 // TECH STACK: [React 19 & Lucide Icons] - Live Job Openings Interactive Dashboard
-// Displays live opportunities aggregated from JSearch (RapidAPI) / Adzuna APIs
+// Displays live opportunities aggregated from Jobvetta / JSearch / Adzuna APIs
+// with 1-Click Smart Apply, resume auto-fill, and candidate screening dialog.
 // ==============================================================================
-import React, { useState, useMemo } from 'react';
-import { MapPin, Briefcase, Building2, ExternalLink, Search, Filter, Sparkles } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  MapPin,
+  Briefcase,
+  Building2,
+  ExternalLink,
+  Search,
+  Filter,
+  Sparkles,
+  CheckCircle,
+  Send,
+} from 'lucide-react';
+import ApplyModal from './ApplyModal';
+import { apiService } from './api/client';
 
 function normalizeJob(job) {
   const role = job.role_category || 'Software Professional';
@@ -35,14 +48,8 @@ function normalizeJob(job) {
   };
 }
 
-function JobCard({ job, index }) {
+function JobCard({ job, index, onApplyClick, isApplied }) {
   const j = normalizeJob(job);
-  const [isOpening, setIsOpening] = useState(false);
-
-  const handleApplyClick = () => {
-    setIsOpening(true);
-    setTimeout(() => setIsOpening(false), 2500);
-  };
 
   return (
     <article className="tw-property-card" style={{ animationDelay: `${index * 60}ms` }}>
@@ -68,30 +75,47 @@ function JobCard({ job, index }) {
           <MapPin size={14} className="me-1 text-danger" />
           {j.location}
         </p>
-        <div className="tw-property-card__footer mt-3">
-          <a
-            className={`btn btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-1 ${isOpening ? 'btn-success' : 'btn-primary tw-btn-primary'}`}
-            href={j.redirect_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleApplyClick}
-          >
-            {isOpening ? (
-              <span>✓ Opening {j.portal}...</span>
-            ) : (
-              <>
-                <span>Apply on {j.portal}</span>
-                <ExternalLink size={14} />
-              </>
-            )}
-          </a>
+
+        <div className="tw-property-card__footer mt-3 d-flex flex-column gap-2">
+          {isApplied ? (
+            <button
+              type="button"
+              className="btn btn-sm btn-success w-100 d-inline-flex align-items-center justify-content-center gap-1"
+              disabled
+            >
+              <CheckCircle size={14} />
+              <span>✓ Applied</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary tw-btn-primary w-100 d-inline-flex align-items-center justify-content-center gap-1 shadow-sm"
+              onClick={() => onApplyClick(j)}
+            >
+              <Send size={13} />
+              <span>Apply with Resume</span>
+            </button>
+          )}
+
+          {j.redirect_url && (
+            <a
+              href={j.redirect_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-center text-muted small text-decoration-none d-inline-flex align-items-center justify-content-center gap-1"
+              style={{ fontSize: '0.75rem' }}
+            >
+              <span>View direct posting on {j.portal}</span>
+              <ExternalLink size={11} />
+            </a>
+          )}
         </div>
       </div>
     </article>
   );
 }
 
-function RoleJobGroup({ roleName, jobs }) {
+function RoleJobGroup({ roleName, jobs, onApplyClick, appliedJobs = {} }) {
   return (
     <section className="tw-listing-group mb-4">
       <div className="tw-listing-group__head d-flex justify-content-between align-items-center mb-3">
@@ -100,11 +124,21 @@ function RoleJobGroup({ roleName, jobs }) {
       </div>
       <div className="row g-4">
         {(jobs || []).length > 0 ? (
-          jobs.map((job, i) => (
-            <div key={`${roleName}-${job.job_title}-${i}`} className="col-md-6 col-lg-4 col-xl-3">
-              <JobCard job={job} index={i} />
-            </div>
-          ))
+          jobs.map((job, i) => {
+            const jNorm = normalizeJob(job);
+            const key = `${jNorm.company_name.toLowerCase()}::${jNorm.job_title.toLowerCase()}`;
+            const isApplied = Boolean(appliedJobs[key]);
+            return (
+              <div key={`${roleName}-${job.job_title}-${i}`} className="col-md-6 col-lg-4 col-xl-3">
+                <JobCard
+                  job={job}
+                  index={i}
+                  onApplyClick={onApplyClick}
+                  isApplied={isApplied}
+                />
+              </div>
+            );
+          })
         ) : (
           <div className="col-12">
             <div className="tw-listing-empty p-4 text-center text-muted border rounded bg-light">
@@ -151,10 +185,30 @@ export default function LiveJobOpenings({
   loading = false,
   title = "Live Job Openings — India",
   subtitle = null,
+  candidateProfile = {},
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('All');
   const [selectedRoleTab, setSelectedRoleTab] = useState('All');
+  const [activeApplyJob, setActiveApplyJob] = useState(null);
+  const [appliedJobs, setAppliedJobs] = useState({});
+
+  useEffect(() => {
+    apiService.getAppliedJobs()
+      .then((res) => {
+        if (res?.applied_keys && Array.isArray(res.applied_keys)) {
+          const map = {};
+          res.applied_keys.forEach((k) => { map[k] = true; });
+          setAppliedJobs((prev) => ({ ...prev, ...map }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleApplySuccess = (job, res) => {
+    const key = `${(job.company_name || '').toLowerCase()}::${(job.job_title || '').toLowerCase()}`;
+    setAppliedJobs((prev) => ({ ...prev, [key]: true }));
+  };
 
   const roleOrder = useMemo(() => {
     if ((recommendedRoles || []).length > 0) return recommendedRoles;
@@ -304,8 +358,19 @@ export default function LiveJobOpenings({
           key={roleName}
           roleName={roleName}
           jobs={filteredJobsByRole[roleName] || []}
+          onApplyClick={setActiveApplyJob}
+          appliedJobs={appliedJobs}
         />
       ))}
+
+      {activeApplyJob && (
+        <ApplyModal
+          job={activeApplyJob}
+          candidateProfile={candidateProfile}
+          onClose={() => setActiveApplyJob(null)}
+          onApplySuccess={handleApplySuccess}
+        />
+      )}
     </section>
   );
 }

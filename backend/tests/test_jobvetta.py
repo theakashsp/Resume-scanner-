@@ -70,3 +70,4 @@ def test_jobs_provider_status_reflects_jobvetta():
         assert status["jobvetta_configured"] is True
         assert status["any_provider"] is True
         assert "Jobvetta" in status["provider_name"]
+

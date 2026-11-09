@@ -180,6 +180,11 @@ def init_mongo_indexes() -> bool:
         # 4. Failed logins / brute force tracker
         db.failed_logins.create_index("email", unique=True, background=True)
 
+        # 5. Job applications tracking
+        db.applications.create_index("candidate_email", background=True)
+        db.applications.create_index("job_key", background=True)
+        db.applications.create_index("created_at", background=True)
+
         _indexes_initialized = True
         logger.info("[MongoDB] Schema indexes created successfully on all collections.")
         return True
@@ -206,4 +211,9 @@ def get_analyses_col() -> Collection | None:
 def get_failed_logins_col() -> Collection | None:
     db = get_mongo_db()
     return db.failed_logins if db is not None else None
+
+
+def get_applications_col() -> Collection | None:
+    db = get_mongo_db()
+    return db.applications if db is not None else None
 

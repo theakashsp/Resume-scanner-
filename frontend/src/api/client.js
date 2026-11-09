@@ -213,6 +213,17 @@ export const apiService = {
     const res = await apiClient.get('/health', { timeout: 10000 });
     return res.data;
   },
+
+  // 1-Click Smart Apply & Job Tracking
+  async applyToJob(payload) {
+    const res = await apiClient.post('/api/jobs/apply', payload);
+    return res.data;
+  },
+
+  async getAppliedJobs() {
+    const res = await apiClient.get('/api/jobs/applied');
+    return res.data;
+  },
 };
 
 export default apiClient;

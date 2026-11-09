@@ -604,6 +604,18 @@ function App() {
   const jobsMessage = results?.jobs_message ?? null;
   const jobsCount = results?.jobs_count ?? 0;
 
+  const candidateProfile = useMemo(() => {
+    return {
+      name: candidateName !== 'Not found' ? candidateName : (authUser?.name || ''),
+      email: candidateEmail !== 'Not found' ? candidateEmail : (authUser?.email || ''),
+      phone: candidatePhone !== 'Not found' ? candidatePhone : (authUser?.phone || ''),
+      college: candidateCollege !== 'Not found' ? candidateCollege : '',
+      matchedSkills: matched,
+      predictedRole: role || selectedExploreRole,
+      atsScore: results?.ats_score ?? 85,
+    };
+  }, [candidateName, candidateEmail, candidatePhone, candidateCollege, matched, role, selectedExploreRole, authUser, results]);
+
   const generatePDFReport = () => {
     if (!results) return;
     generateCareerReportPdf({
@@ -790,6 +802,7 @@ function App() {
                   loading={false}
                   title="Personalized Job Matches — For Your Profile"
                   subtitle="Verified India openings matching your evaluated resume skills & recommended roles"
+                  candidateProfile={candidateProfile}
                 />
               </div>
             </div>
@@ -829,6 +842,7 @@ function App() {
               loading={exploreLoading}
               title={`Live Openings for ${selectedExploreRole}`}
               subtitle="Browse real-time openings in India across top tech companies, startups & enterprises"
+              candidateProfile={candidateProfile}
             />
           </div>
         </section>

@@ -6,6 +6,7 @@ backend/venv/
 backend/uploads/
 backend/platform_stats.json
 backend/users_data.json
+backend/applications_data.json
 frontend/node_modules/
 frontend/build/
 __pycache__/

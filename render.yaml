@@ -24,6 +24,8 @@ services:
         value: production
       - key: GEMINI_API_KEY
         sync: false
+      - key: JOBVETTA_API_KEY
+        sync: false
       - key: RAPIDAPI_KEY
         sync: false
       - key: RAPIDAPI_HOST
