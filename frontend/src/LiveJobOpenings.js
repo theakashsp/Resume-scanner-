@@ -107,7 +107,35 @@ function RoleJobGroup({ roleName, jobs }) {
           ))
         ) : (
           <div className="col-12">
-            <p className="tw-listing-empty p-4 text-center text-muted border rounded">No matching openings for this role with the selected filters.</p>
+            <div className="tw-listing-empty p-4 text-center text-muted border rounded bg-light">
+              <p className="mb-2">No matching openings for this role with the selected filters.</p>
+              <div className="d-flex flex-wrap justify-content-center gap-2 mt-3">
+                <a
+                  href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(roleName)}&location=India`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm btn-outline-primary"
+                >
+                  Search on LinkedIn
+                </a>
+                <a
+                  href={`https://www.naukri.com/${encodeURIComponent(roleName).toLowerCase().replace(/[^a-z0-9]+/g, '-')}-jobs-in-india`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm btn-outline-secondary"
+                >
+                  Search on Naukri
+                </a>
+                <a
+                  href={`https://in.indeed.com/jobs?q=${encodeURIComponent(roleName)}&l=India`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm btn-outline-info"
+                >
+                  Search on Indeed
+                </a>
+              </div>
+            </div>
           </div>
         )}
       </div>

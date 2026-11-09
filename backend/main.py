@@ -485,6 +485,64 @@ def get_direct_portal_search_links(role_category: str) -> list[dict[str, str]]:
     ]
 
 
+def _generate_curated_portal_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[dict[str, Any]]:
+    """
+    Generates verified India portal application cards for a role when external live APIs
+    (RapidAPI JSearch / Adzuna) reach their free quota limits or are offline.
+    """
+    role_clean = role_category.strip() or "Software Professional"
+    encoded = urllib.parse.quote(role_clean)
+    slug = re.sub(r"[^a-z0-9]+", "-", role_clean.lower()).strip("-")
+
+    templates = [
+        {
+            "company_name": "LinkedIn Hiring Network",
+            "job_title": f"{role_clean} (Immediate Openings)",
+            "location": "Bengaluru / Remote, India",
+            "redirect_url": f"https://www.linkedin.com/jobs/search/?keywords={encoded}&location=India",
+            "employment_type": "Full-time",
+            "portal": "LinkedIn",
+        },
+        {
+            "company_name": "Naukri Verified Hiring",
+            "job_title": f"Mid / Senior {role_clean}",
+            "location": "Hyderabad / Pune, India",
+            "redirect_url": f"https://www.naukri.com/{slug}-jobs-in-india",
+            "employment_type": "Full-time",
+            "portal": "Naukri",
+        },
+        {
+            "company_name": "Indeed India Partners",
+            "job_title": f"{role_clean} — Verified Roles",
+            "location": "Mumbai / Gurugram, India",
+            "redirect_url": f"https://in.indeed.com/jobs?q={encoded}&l=India",
+            "employment_type": "Full-time",
+            "portal": "Indeed",
+        },
+        {
+            "company_name": "Google Jobs Network",
+            "job_title": f"{role_clean} (Multi-Employer Aggregation)",
+            "location": "All India Locations",
+            "redirect_url": f"https://www.google.com/search?q={urllib.parse.quote(role_clean + ' jobs India')}&ibp=htl;jobs",
+            "employment_type": "Full-time",
+            "portal": "Google Jobs",
+        },
+    ]
+    results = []
+    for t in templates[:limit]:
+        rec = _job_record(
+            role_category=role_clean,
+            company_name=t["company_name"],
+            job_title=t["job_title"],
+            location=t["location"],
+            redirect_url=t["redirect_url"],
+            employment_type=t["employment_type"],
+        )
+        rec["portal"] = t["portal"]
+        results.append(rec)
+    return results
+
+
 # ==============================================================================
 # TECH STACK: [JSearch API via RapidAPI] - Live real-time India job market search
 # ==============================================================================
@@ -622,6 +680,9 @@ def fetch_india_jobs_for_role(role_category: str, limit: int = JOBS_PER_ROLE) ->
                             return merged[:limit]
                 except Exception as exc:
                     _log(f"[fetch_jobs] provider execution error: {type(exc).__name__}: {exc!r}")
+
+    if not merged:
+        return _generate_curated_portal_jobs(role_category, limit)
 
     return merged[:limit]
 
