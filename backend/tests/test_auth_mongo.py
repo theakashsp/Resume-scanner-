@@ -111,3 +111,4 @@ def test_mongo_register_and_login_flow(mock_mongo_collections):
     auth_store.logout(token)
     assert len(sessions.docs) == 0
     assert auth_store.get_user_by_token(token) is None
+

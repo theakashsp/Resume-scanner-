@@ -206,3 +206,4 @@ def get_analyses_col() -> Collection | None:
 def get_failed_logins_col() -> Collection | None:
     db = get_mongo_db()
     return db.failed_logins if db is not None else None
+
