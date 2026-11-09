@@ -224,6 +224,18 @@ export const apiService = {
     const res = await apiClient.get('/api/jobs/applied');
     return res.data;
   },
+
+  async getApplications(email = '') {
+    const res = await apiClient.get('/api/jobs/applications', {
+      params: email ? { email } : {},
+    });
+    return res.data;
+  },
+
+  async replyToApplication(appId, payload) {
+    const res = await apiClient.post(`/api/jobs/applications/${encodeURIComponent(appId)}/reply`, payload);
+    return res.data;
+  },
 };
 
 export default apiClient;

@@ -155,6 +155,7 @@ def _is_transient_gemini_error(exc: BaseException) -> bool:
     return any(marker in blob for marker in _TRANSIENT_GEMINI_MARKERS)
 
 import database
+import email_service
 import mongo
 import s3_storage
 
@@ -406,6 +407,12 @@ class JobApplyRequest(BaseModel):
     expected_ctc: str = "Negotiable"
     work_mode: str = "Flexible / Remote"
     cover_note: str = ""
+
+
+class RecruiterReplyRequest(BaseModel):
+    reply_message: str = "Thank you for applying! We reviewed your profile and would like to schedule an interview."
+    new_status: str = "Recruiter Replied"
+    interviewer_name: str = "Talent Acquisition Team"
 
 
 
@@ -1665,6 +1672,26 @@ def _store_local_application(rec: dict[str, Any]) -> None:
         logger.error(f"[Applications] Error saving local application: {exc}")
 
 
+def _update_local_application_reply(app_id: str, reply: dict[str, Any], new_status: str) -> dict[str, Any] | None:
+    try:
+        if not _APPLICATIONS_FILE.is_file():
+            return None
+        data = json.loads(_APPLICATIONS_FILE.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            return None
+        for doc in data:
+            if str(doc.get("id")) == str(app_id) or str(doc.get("job_key")) == str(app_id):
+                doc["status"] = new_status
+                doc["updated_at"] = time.time()
+                replies = doc.setdefault("recruiter_replies", [])
+                replies.append(reply)
+                _APPLICATIONS_FILE.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+                return doc
+    except Exception as exc:
+        logger.error(f"[Applications] Error updating local reply: {exc}")
+    return None
+
+
 def _load_local_applications(email: str = "") -> list[dict[str, Any]]:
     try:
         if not _APPLICATIONS_FILE.is_file():
@@ -1692,7 +1719,25 @@ def api_jobs_apply(body: JobApplyRequest, authorization: str | None = Header(def
     if not email:
         raise HTTPException(status_code=400, detail="Candidate email is required to submit application.")
 
+    app_id = str(uuid.uuid4())
+
+    # Automated Email Confirmation to Candidate
+    email_res = email_service.send_application_confirmation_email(
+        candidate_name=body.candidate_name,
+        candidate_email=email,
+        job_title=body.job_title,
+        company_name=body.company_name,
+        job_location=body.job_location,
+        ats_score=body.ats_score,
+        matched_skills=body.matched_skills,
+        notice_period=body.notice_period,
+        expected_ctc=body.expected_ctc,
+        work_mode=body.work_mode,
+        redirect_url=body.redirect_url,
+    )
+
     app_record = {
+        "id": app_id,
         "candidate_name": body.candidate_name,
         "candidate_email": email,
         "candidate_phone": body.candidate_phone,
@@ -1709,19 +1754,23 @@ def api_jobs_apply(body: JobApplyRequest, authorization: str | None = Header(def
         "expected_ctc": body.expected_ctc,
         "work_mode": body.work_mode,
         "cover_note": body.cover_note,
-        "status": "Applied",
+        "status": "Confirmation Sent" if email_res.get("sent", True) else "Applied",
+        "email_sent": email_res.get("sent", True),
+        "email_delivery": email_res.get("mode", "simulated"),
+        "email_subject": email_res.get("subject", f"Application Confirmed: {body.job_title} at {body.company_name}"),
+        "email_sent_to": email,
+        "recruiter_replies": [],
         "created_at": time.time(),
         "job_key": f"{body.company_name.lower()}::{body.job_title.lower()}",
     }
 
     # 1. MongoDB Persistence (Primary Cloud Store)
-    saved_id = None
     if mongo.is_mongo_configured():
         try:
             col = mongo.get_applications_col()
             if col is not None:
-                res = col.insert_one(dict(app_record))
-                saved_id = str(res.inserted_id)
+                doc_to_save = dict(app_record)
+                col.insert_one(doc_to_save)
                 logger.info(f"[Applications] Stored application in MongoDB: {app_record['job_key']} for {email}")
         except Exception as exc:
             logger.error(f"[Applications] MongoDB insert error: {exc}")
@@ -1731,11 +1780,130 @@ def api_jobs_apply(body: JobApplyRequest, authorization: str | None = Header(def
 
     return {
         "ok": True,
-        "message": f"Successfully applied to {body.job_title} at {body.company_name}!",
-        "application_id": saved_id or str(uuid.uuid4()),
-        "status": "Applied",
+        "message": f"Successfully applied to {body.job_title} at {body.company_name}! Confirmation email sent.",
+        "application_id": app_id,
+        "status": app_record["status"],
+        "email_sent": app_record["email_sent"],
+        "email_delivery": app_record["email_delivery"],
         "applied_at": app_record["created_at"],
         "job_key": app_record["job_key"],
+    }
+
+
+@app.get("/api/jobs/applications")
+def api_jobs_applications(authorization: str | None = Header(default=None), email: str | None = None):
+    """
+    Returns full history of applied jobs with real-time status and recruiter responses.
+    """
+    user_email = (email or "").strip().lower()
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+        user = auth_store.get_user_by_token(token)
+        if user and user.get("email"):
+            user_email = user["email"].strip().lower()
+
+    apps_map: dict[str, dict[str, Any]] = {}
+
+    # 1. MongoDB
+    if mongo.is_mongo_configured():
+        try:
+            col = mongo.get_applications_col()
+            if col is not None:
+                query = {}
+                if user_email:
+                    query = {"candidate_email": {"$regex": f"^{re.escape(user_email)}$", "$options": "i"}}
+                for doc in col.find(query).sort("created_at", -1):
+                    rec = dict(doc)
+                    if "_id" in rec:
+                        rec["mongo_id"] = str(rec["_id"])
+                        del rec["_id"]
+                    doc_id = str(rec.get("id") or rec.get("mongo_id") or rec.get("job_key"))
+                    rec["id"] = doc_id
+                    apps_map[doc_id] = rec
+        except Exception as exc:
+            logger.error(f"[Applications] MongoDB query error: {exc}")
+
+    # 2. Local Fallback
+    local_apps = _load_local_applications(user_email)
+    for doc in local_apps:
+        doc_id = str(doc.get("id") or doc.get("job_key") or uuid.uuid4())
+        doc["id"] = doc_id
+        if doc_id not in apps_map:
+            apps_map[doc_id] = doc
+
+    application_list = sorted(
+        apps_map.values(),
+        key=lambda x: float(x.get("created_at") or 0),
+        reverse=True,
+    )
+
+    return {
+        "applications": application_list,
+        "count": len(application_list),
+        "user_email": user_email,
+    }
+
+
+@app.post("/api/jobs/applications/{app_id}/reply")
+def api_jobs_application_reply(app_id: str, body: RecruiterReplyRequest):
+    """
+    Records a recruiter reply/follow-up message and updates application status.
+    """
+    reply_entry = {
+        "id": str(uuid.uuid4()),
+        "message": body.reply_message.strip(),
+        "recruiter_name": (body.interviewer_name or "Talent Acquisition Team").strip(),
+        "created_at": time.time(),
+        "new_status": body.new_status,
+    }
+
+    found = False
+    updated_doc = None
+
+    # 1. Update in MongoDB
+    if mongo.is_mongo_configured():
+        try:
+            col = mongo.get_applications_col()
+            if col is not None:
+                query_clauses = [{"id": app_id}, {"job_key": app_id}]
+                try:
+                    from bson import ObjectId
+                    if ObjectId.is_valid(app_id):
+                        query_clauses.append({"_id": ObjectId(app_id)})
+                except Exception:
+                    pass
+
+                res = col.find_one_and_update(
+                    {"$or": query_clauses},
+                    {
+                        "$set": {"status": body.new_status, "updated_at": time.time()},
+                        "$push": {"recruiter_replies": reply_entry},
+                    },
+                    return_document=True,
+                )
+                if res:
+                    found = True
+                    rec = dict(res)
+                    if "_id" in rec:
+                        rec["mongo_id"] = str(rec["_id"])
+                        del rec["_id"]
+                    updated_doc = rec
+        except Exception as exc:
+            logger.error(f"[Applications] MongoDB reply update error: {exc}")
+
+    # 2. Update in Local Storage
+    local_updated = _update_local_application_reply(app_id, reply_entry, body.new_status)
+    if not updated_doc and local_updated:
+        updated_doc = local_updated
+        found = True
+
+    if not found and not updated_doc:
+        raise HTTPException(status_code=404, detail=f"Application with ID '{app_id}' not found.")
+
+    return {
+        "ok": True,
+        "message": f"Status updated to '{body.new_status}' and recruiter reply recorded.",
+        "application": updated_doc,
     }
 
 

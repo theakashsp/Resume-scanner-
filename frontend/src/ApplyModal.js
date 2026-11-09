@@ -28,6 +28,7 @@ export default function ApplyModal({
   candidateProfile = {},
   onClose,
   onApplySuccess,
+  onViewApplications,
 }) {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -353,6 +354,10 @@ export default function ApplyModal({
                 <span className="text-muted small">Status:</span>
                 <span className="badge bg-success text-light">✓ Applied &amp; Tracked</span>
               </div>
+              <div className="d-flex justify-content-between mb-1">
+                <span className="text-muted small">Confirmation Email:</span>
+                <span className="badge bg-info text-light">✓ Sent to {email}</span>
+              </div>
               <div className="d-flex justify-content-between">
                 <span className="text-muted small">Notice / CTC:</span>
                 <span className="small text-dark">{noticePeriod} • {expectedCtc}</span>
@@ -360,6 +365,17 @@ export default function ApplyModal({
             </div>
 
             <div className="d-flex flex-wrap justify-content-center gap-2">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1"
+                onClick={() => {
+                  onClose();
+                  onViewApplications?.();
+                }}
+              >
+                <Sparkles size={13} />
+                <span>View in Applied Jobs Tracker</span>
+              </button>
               {job.redirect_url && (
                 <a
                   href={job.redirect_url}
@@ -367,8 +383,8 @@ export default function ApplyModal({
                   rel="noopener noreferrer"
                   className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
                 >
-                  <span>Open {job.portal || 'Employer Portal'} Directly</span>
-                  <ExternalLink size={14} />
+                  <span>Open {job.portal || 'Employer Portal'}</span>
+                  <ExternalLink size={13} />
                 </a>
               )}
               <button

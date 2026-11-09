@@ -186,6 +186,7 @@ export default function LiveJobOpenings({
   title = "Live Job Openings — India",
   subtitle = null,
   candidateProfile = {},
+  onOpenApplications = null,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('All');
@@ -277,6 +278,22 @@ export default function LiveJobOpenings({
             ? `${totalJobs} verified openings matched across LinkedIn, Naukri, Indeed & top employers`
             : 'Real-time verified India job search')}
         </p>
+        {onOpenApplications && (
+          <div className="mt-2">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 shadow-sm px-3"
+              style={{ borderRadius: '20px' }}
+              onClick={onOpenApplications}
+            >
+              <Briefcase size={14} />
+              <span>Applied Jobs Tracker</span>
+              <span className="badge bg-primary text-white ms-1 rounded-pill" style={{ fontSize: '0.72rem' }}>
+                {Object.keys(appliedJobs).length}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -369,6 +386,7 @@ export default function LiveJobOpenings({
           candidateProfile={candidateProfile}
           onClose={() => setActiveApplyJob(null)}
           onApplySuccess={handleApplySuccess}
+          onViewApplications={onOpenApplications}
         />
       )}
     </section>

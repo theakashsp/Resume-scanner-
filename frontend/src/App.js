@@ -42,6 +42,7 @@ import {
 import LiveJobOpenings from './LiveJobOpenings';
 import SignInPage from './SignInPage';
 import RegisterPage from './RegisterPage';
+import ApplicationsModal from './ApplicationsModal';
 
 // --- [TECH STACK: jsPDF & jspdf-autotable] Career Report Generator ---
 import { generateCareerReportPdf } from './pdfReport';
@@ -90,7 +91,7 @@ function BrandName({ variant = 'header' }) {
   );
 }
 
-function Navbar({ scrolled, user, onOpenAuth, onLogout, onGoHome }) {
+function Navbar({ scrolled, user, onOpenAuth, onLogout, onGoHome, onOpenApplications, appliedCount = 0 }) {
   const scrollTo = (id) => {
     onGoHome?.();
     setTimeout(() => {
@@ -113,6 +114,21 @@ function Navbar({ scrolled, user, onOpenAuth, onLogout, onGoHome }) {
           <a href="#listings" onClick={(e) => { e.preventDefault(); scrollTo('listings'); }}>Listings</a>
         </div>
         <div className="tw-navbar__actions">
+          <button
+            type="button"
+            className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1"
+            style={{ borderRadius: '20px', padding: '0.3rem 0.8rem', fontSize: '0.82rem', fontWeight: 600 }}
+            onClick={onOpenApplications}
+            title="Track applied jobs, emails, and recruiter replies"
+          >
+            <Briefcase size={14} />
+            <span>Applied Jobs</span>
+            {appliedCount > 0 && (
+              <span className="badge bg-primary text-white ms-1 rounded-pill" style={{ fontSize: '0.7rem' }}>
+                {appliedCount}
+              </span>
+            )}
+          </button>
           {user ? (
             <>
               <span className="tw-navbar__user" title={user.email || user.phone || user.name}>
@@ -470,6 +486,18 @@ function App() {
   const [exploreJobsData, setExploreJobsData] = useState(null);
   const [selectedExploreRole, setSelectedExploreRole] = useState('Full Stack Developer');
   const [exploreLoading, setExploreLoading] = useState(false);
+  const [showApplicationsModal, setShowApplicationsModal] = useState(false);
+  const [appliedJobsCount, setAppliedJobsCount] = useState(0);
+
+  const refreshAppliedCount = () => {
+    apiService.getAppliedJobs()
+      .then((res) => {
+        if (res?.applied_keys && Array.isArray(res.applied_keys)) {
+          setAppliedJobsCount(res.applied_keys.length);
+        }
+      })
+      .catch(() => {});
+  };
 
   const timelineStep = useMemo(() => {
     if (results) return 3;
@@ -511,7 +539,8 @@ function App() {
   useEffect(() => {
     apiService.getPlatformStats().then((data) => setPlatformStats(data)).catch(() => {});
     apiService.getFeatures().then((data) => setFeatures(data?.features || [])).catch(() => {});
-  }, []);
+    refreshAppliedCount();
+  }, [authUser]);
 
   useEffect(() => {
     setExploreLoading(true);
@@ -647,6 +676,8 @@ function App() {
         onOpenAuth={(mode) => setAuthPage(mode)}
         onLogout={handleLogout}
         onGoHome={() => setAuthPage(null)}
+        onOpenApplications={() => setShowApplicationsModal(true)}
+        appliedCount={appliedJobsCount}
       />
 
       {authPage === 'signin' && (
@@ -803,6 +834,7 @@ function App() {
                   title="Personalized Job Matches — For Your Profile"
                   subtitle="Verified India openings matching your evaluated resume skills & recommended roles"
                   candidateProfile={candidateProfile}
+                  onOpenApplications={() => setShowApplicationsModal(true)}
                 />
               </div>
             </div>
@@ -843,6 +875,7 @@ function App() {
               title={`Live Openings for ${selectedExploreRole}`}
               subtitle="Browse real-time openings in India across top tech companies, startups & enterprises"
               candidateProfile={candidateProfile}
+              onOpenApplications={() => setShowApplicationsModal(true)}
             />
           </div>
         </section>
@@ -851,6 +884,13 @@ function App() {
       <Footer />
         </>
       )}
+
+      <ApplicationsModal
+        isOpen={showApplicationsModal}
+        onClose={() => setShowApplicationsModal(false)}
+        candidateEmail={candidateEmail !== 'Not found' ? candidateEmail : (authUser?.email || '')}
+        onApplicationUpdated={refreshAppliedCount}
+      />
     </div>
   );
 }
