@@ -21,6 +21,8 @@ services:
       - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,${FRONTEND_URL:-}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - DATABASE_URL=${DATABASE_URL:-}
+      - MONGODB_URI=${MONGODB_URI:-}
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-resume_analyzer}
       - DATA_DIR=/app/data
     volumes:
       - backend_data:/app/data

@@ -153,6 +153,7 @@ def _is_transient_gemini_error(exc: BaseException) -> bool:
     return any(marker in blob for marker in _TRANSIENT_GEMINI_MARKERS)
 
 import database
+import mongo
 import s3_storage
 
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
@@ -246,7 +247,10 @@ async def request_logging_middleware(request, call_next):
 
 @app.on_event("startup")
 def on_app_startup():
-    database.init_db()
+    if mongo.is_mongo_configured():
+        mongo.init_mongo_indexes()
+    if database.is_database_configured():
+        database.init_db()
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -1316,6 +1320,11 @@ def health():
             "configured": database.is_database_configured(),
             "type": "relational_db" if database.is_database_configured() else "json_fallback",
         },
+        "mongodb_status": {
+            "configured": mongo.is_mongo_configured(),
+            "connected": mongo.is_mongo_connected() if mongo.is_mongo_configured() else False,
+            "database": mongo._resolve_db_name(mongo._resolve_mongo_uri()) if mongo.is_mongo_configured() else None,
+        },
         "s3_storage_status": {
             "enabled": s3_storage.is_s3_enabled(),
         },
@@ -1480,7 +1489,7 @@ async def _analyze_impl(file: UploadFile, job_description: str | None = None) ->
         # Privacy-conscious logging: log only non-sensitive operational metrics
         _log(f"[analyze] Successfully analyzed resume: {len(text)} chars, domain={domain}, target_role={role}, source={ai.get('_source')}")
 
-        return {
+        result_payload = {
             "ats_score": ats,
             "predicted_role": role,
             "target_role": role,
@@ -1510,6 +1519,25 @@ async def _analyze_impl(file: UploadFile, job_description: str | None = None) ->
             "candidate_college": details.get("candidate_college", "Not found"),
             **jobs_payload,
         }
+
+        # Persist analysis summary to MongoDB if configured
+        if mongo.is_mongo_configured():
+            try:
+                analyses_col = mongo.get_analyses_col()
+                if analyses_col is not None:
+                    analyses_col.insert_one({
+                        "candidate_name": details.get("candidate_name", ""),
+                        "candidate_email": details.get("candidate_email", ""),
+                        "candidate_phone": details.get("candidate_phone", ""),
+                        "detected_domain": domain,
+                        "ats_score": ats,
+                        "recommended_roles": recommended_roles[:5],
+                        "created_at": time.time(),
+                    })
+            except Exception as mongo_err:
+                logger.warning(f"[analyze] Could not record analysis to MongoDB: {mongo_err}")
+
+        return result_payload
     except HTTPException:
         raise
     except Exception as e:

@@ -17,6 +17,7 @@ from typing import Any
 
 from database import get_db_session, is_database_configured
 from logger import logger
+import mongo
 from models import User, UserSession
 
 _BACKEND_DIR = Path(__file__).resolve().parent
@@ -89,7 +90,15 @@ def _save_users(data: dict[str, Any]) -> None:
 
 
 # ==============================================================================
-# Core Authentication API Methods (Pluggable: Database vs JSON Fallback)
+# Helper to determine if MongoDB is active and ready
+# ==============================================================================
+def is_mongo_active() -> bool:
+    """Returns True if MongoDB is configured and users collection is accessible."""
+    return mongo.is_mongo_configured() and mongo.get_users_col() is not None
+
+
+# ==============================================================================
+# Core Authentication API Methods (Pluggable: MongoDB -> SQL -> JSON Fallback)
 # ==============================================================================
 def register_user(name: str, email: str, password: str, phone: str = "") -> dict[str, Any]:
     clean_name = " ".join((name or "").split())
@@ -98,8 +107,8 @@ def register_user(name: str, email: str, password: str, phone: str = "") -> dict
 
     email_n = normalize_email(email)
 
-    if len(password or "") < 8:
-        raise ValueError("Password must be at least 8 characters long.")
+    if len(password or "") < 6:
+        raise ValueError("Password must be at least 6 characters long.")
 
     phone_clean = ""
     if phone and phone.strip():
@@ -108,6 +117,32 @@ def register_user(name: str, email: str, password: str, phone: str = "") -> dict
     salt, pwd_hash = _hash_password(password)
     created_at = int(time.time())
 
+    # Option 1: MongoDB (Primary)
+    if is_mongo_active():
+        try:
+            users_col = mongo.get_users_col()
+            existing = users_col.find_one({"email": email_n})
+            if existing:
+                raise ValueError("An account with this email already exists. Please sign in.")
+
+            doc = {
+                "name": clean_name,
+                "email": email_n,
+                "phone": phone_clean,
+                "salt": salt,
+                "password_hash": pwd_hash,
+                "created_at": created_at,
+                "updated_at": created_at,
+            }
+            users_col.insert_one(doc)
+            logger.info(f"[Auth] Registered new user via MongoDB: {email_n}")
+            return {"name": clean_name, "email": email_n, "phone": phone_clean}
+        except ValueError:
+            raise
+        except Exception as exc:
+            logger.error(f"[Auth] MongoDB register error: {exc}. Falling back to secondary stores.")
+
+    # Option 2: Relational database (PostgreSQL / SQLite)
     if is_database_configured():
         with get_db_session() as session:
             existing = session.query(User).filter_by(email=email_n).first()
@@ -125,7 +160,7 @@ def register_user(name: str, email: str, password: str, phone: str = "") -> dict
             logger.info(f"[Auth] Registered new user via PostgreSQL: {email_n}")
             return {"name": clean_name, "email": email_n, "phone": phone_clean}
 
-    # Fallback to local JSON store
+    # Option 3: Fallback to local JSON store
     data = _load_users()
     if email_n in data["users"]:
         raise ValueError("An account with this email already exists. Please sign in.")
@@ -170,6 +205,38 @@ def login_user(email: str, password: str) -> dict[str, Any]:
     token = secrets.token_urlsafe(32)
     expires_at = now + _SESSION_TTL_SEC
 
+    # Option 1: MongoDB (Primary)
+    if is_mongo_active():
+        try:
+            users_col = mongo.get_users_col()
+            sessions_col = mongo.get_sessions_col()
+            user = users_col.find_one({"email": email_n})
+            if not user or not _verify_password(password, user.get("salt", ""), user.get("password_hash", "")):
+                _record_failure()
+                raise ValueError("Invalid email or password. Please try again.")
+
+            _failed_logins.pop(email_n, None)
+            sessions_col.insert_one({
+                "token": token,
+                "email": email_n,
+                "expires_at": expires_at,
+                "created_at": now,
+            })
+            logger.info(f"[Auth] Successful login via MongoDB: {email_n}")
+            return {
+                "token": token,
+                "user": {
+                    "name": user["name"],
+                    "email": email_n,
+                    "phone": user.get("phone", ""),
+                },
+            }
+        except ValueError:
+            raise
+        except Exception as exc:
+            logger.error(f"[Auth] MongoDB login error: {exc}. Trying fallback stores.")
+
+    # Option 2: Relational database (PostgreSQL / SQLite)
     if is_database_configured():
         with get_db_session() as session:
             user = session.query(User).filter_by(email=email_n).first()
@@ -195,7 +262,7 @@ def login_user(email: str, password: str) -> dict[str, Any]:
                 },
             }
 
-    # Fallback to local JSON store
+    # Option 3: Fallback to local JSON store
     data = _load_users()
     user = data["users"].get(email_n)
 
@@ -222,6 +289,32 @@ def get_user_by_token(token: str | None) -> dict[str, Any] | None:
 
     now = time.time()
 
+    # Option 1: MongoDB (Primary)
+    if is_mongo_active():
+        try:
+            sessions_col = mongo.get_sessions_col()
+            users_col = mongo.get_users_col()
+            session_doc = sessions_col.find_one({"token": token})
+            if not session_doc:
+                return None
+
+            if float(session_doc.get("expires_at", 0)) < now:
+                sessions_col.delete_one({"token": token})
+                return None
+
+            user_doc = users_col.find_one({"email": session_doc["email"]})
+            if not user_doc:
+                return None
+
+            return {
+                "name": user_doc["name"],
+                "email": user_doc["email"],
+                "phone": user_doc.get("phone", ""),
+            }
+        except Exception as exc:
+            logger.error(f"[Auth] MongoDB get_user_by_token error: {exc}")
+
+    # Option 2: Relational database (PostgreSQL / SQLite)
     if is_database_configured():
         with get_db_session() as session:
             user_session = session.query(UserSession).filter_by(token=token).first()
@@ -239,7 +332,7 @@ def get_user_by_token(token: str | None) -> dict[str, Any] | None:
                 "phone": user.phone or "",
             }
 
-    # Fallback to in-memory / JSON store
+    # Option 3: Fallback to in-memory / JSON store
     session_data = _sessions.get(token)
     if not session_data:
         return None
@@ -261,14 +354,25 @@ def logout(token: str | None) -> None:
     if not token:
         return
 
+    # Delete from MongoDB if active
+    if is_mongo_active():
+        try:
+            sessions_col = mongo.get_sessions_col()
+            if sessions_col is not None:
+                sessions_col.delete_one({"token": token})
+                logger.info("[Auth] User logged out, session terminated from MongoDB.")
+        except Exception as exc:
+            logger.error(f"[Auth] MongoDB logout error: {exc}")
+
+    # Delete from PostgreSQL if configured
     if is_database_configured():
         with get_db_session() as session:
             user_session = session.query(UserSession).filter_by(token=token).first()
             if user_session:
                 session.delete(user_session)
                 logger.info("[Auth] User logged out, session terminated from DB.")
-                return
 
+    # Delete from in-memory store
     if token in _sessions:
         _sessions.pop(token, None)
         logger.info("[Auth] User logged out, session terminated from memory.")

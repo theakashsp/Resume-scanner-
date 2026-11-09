@@ -21,10 +21,10 @@ def cleanup_test_user():
 
 
 def test_user_registration_and_password_length_requirement():
-    # Passwords shorter than 8 chars must be rejected
+    # Passwords shorter than 6 chars must be rejected
     with pytest.raises(ValueError) as exc:
-        auth_store.register_user("Test User", "test.engineer@example.com", "short1")
-    assert "8 characters" in str(exc.value)
+        auth_store.register_user("Test User", "test.engineer@example.com", "12345")
+    assert "6 characters" in str(exc.value)
 
     # Valid registration succeeds
     user = auth_store.register_user("Test User", "test.engineer@example.com", "SecurePass123!", "9876543210")
