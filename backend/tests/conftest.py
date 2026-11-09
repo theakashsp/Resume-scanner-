@@ -37,6 +37,18 @@ def mock_external_network_requests(monkeypatch):
                     },
                 ]
             }
+        elif "jobvetta" in url:
+            mock_resp.json.return_value = {
+                "jobs": [
+                    {
+                        "title": "Lead Software Engineer",
+                        "company_name": "Flipkart",
+                        "location": "Bengaluru, India",
+                        "url": "https://careers.flipkart.com/jobs/123",
+                        "employment_type": "Full-time",
+                    }
+                ]
+            }
         elif "adzuna" in url:
             mock_resp.json.return_value = {
                 "results": [

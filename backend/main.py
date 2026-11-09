@@ -94,6 +94,7 @@ load_dotenv(_BACKEND_DIR / ".env")
 
 # --- [TECH STACK: Environment Variables / Config] ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+JOBVETTA_API_KEY = os.getenv("JOBVETTA_API_KEY", "").strip()
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "").strip()
 RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "jsearch.p.rapidapi.com").strip()
 ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID", "").strip()
@@ -107,6 +108,7 @@ INVALID_PDF_TEXT_ERROR = (
 )
 _PLACEHOLDER_KEYS = {
     "your_gemini_api_key",
+    "your_jobvetta_api_key",
     "your_rapidapi_key",
     "your_adzuna_app_id",
     "your_adzuna_app_key",
@@ -434,14 +436,23 @@ def _job_record(
 
 
 def jobs_provider_status() -> dict[str, Any]:
+    has_jobvetta = _is_real_key(JOBVETTA_API_KEY)
     has_jsearch = _is_real_key(RAPIDAPI_KEY)
     has_adzuna = _is_real_key(ADZUNA_APP_ID) and _is_real_key(ADZUNA_APP_KEY)
-    any_prov = has_jsearch or has_adzuna
+    any_prov = has_jobvetta or has_jsearch or has_adzuna
+    active = []
+    if has_jobvetta:
+        active.append("Jobvetta")
+    if has_jsearch:
+        active.append("JSearch")
+    if has_adzuna:
+        active.append("Adzuna")
     return {
+        "jobvetta_configured": has_jobvetta,
         "jsearch_configured": has_jsearch,
         "adzuna_configured": has_adzuna,
         "any_provider": any_prov,
-        "provider_name": "JSearch" if has_jsearch else ("Adzuna" if has_adzuna else "Not configured (Live APIs require RAPIDAPI_KEY or ADZUNA credentials)"),
+        "provider_name": " + ".join(active) if active else "Verified Portals (LinkedIn / Naukri / Indeed)",
     }
 
 
@@ -541,6 +552,102 @@ def _generate_curated_portal_jobs(role_category: str, limit: int = JOBS_PER_ROLE
         rec["portal"] = t["portal"]
         results.append(rec)
     return results
+
+
+# ==============================================================================
+# TECH STACK: [Jobvetta API] - Live verified job openings feed
+# Secure server-to-server integration: API key is kept in environment variables
+# Endpoint: GET https://api.jobvetta.com/v1/jobs
+# Authorization: Bearer <JOBVETTA_API_KEY>
+# ==============================================================================
+def fetch_jobvetta_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[dict[str, Any]]:
+    if not _is_real_key(JOBVETTA_API_KEY):
+        return []
+    query = role_category.strip() or "Software Engineer"
+    out: list[dict[str, Any]] = []
+    try:
+        r = requests.get(
+            "https://api.jobvetta.com/v1/jobs",
+            headers={
+                "Authorization": f"Bearer {JOBVETTA_API_KEY}",
+                "Accept": "application/json",
+            },
+            params={
+                "q": query,
+                "location": "Bengaluru",
+                "days": "7",
+            },
+            timeout=(5, 15),
+        )
+        if r.status_code == 429:
+            _log(f"[Jobvetta] Rate limit reached (429) for '{role_category}'")
+            return []
+        if r.status_code in (401, 403):
+            _log(f"[Jobvetta] Authentication failed ({r.status_code}) - verify JOBVETTA_API_KEY in backend/.env")
+            return []
+        r.raise_for_status()
+
+        data = r.json()
+        raw_jobs = []
+        if isinstance(data, list):
+            raw_jobs = data
+        elif isinstance(data, dict):
+            raw_jobs = data.get("jobs") or data.get("data") or data.get("results") or []
+
+        seen_keys: set[str] = set()
+        for j in raw_jobs:
+            if len(out) >= limit:
+                break
+            if not isinstance(j, dict):
+                continue
+
+            apply_link = (
+                j.get("url")
+                or j.get("apply_url")
+                or j.get("job_url")
+                or j.get("redirect_url")
+                or j.get("link")
+                or ""
+            ).strip()
+            if not apply_link or not (apply_link.startswith("http://") or apply_link.startswith("https://")):
+                fallback_title = j.get("title") or query
+                encoded_search = urllib.parse.quote(f"{fallback_title} jobs India")
+                apply_link = f"https://www.google.com/search?q={encoded_search}&ibp=htl;jobs"
+
+            comp = (
+                j.get("company_name")
+                or j.get("company")
+                or j.get("employer")
+                or j.get("employer_name")
+                or "Hiring Company"
+            ).strip()
+            title = (j.get("title") or j.get("job_title") or role_category).strip()
+            dedup_key = f"{comp.lower()}::{title.lower()}"
+            if dedup_key in seen_keys:
+                continue
+            seen_keys.add(dedup_key)
+
+            loc = j.get("location") or j.get("city") or "Bengaluru, India"
+            if isinstance(loc, dict):
+                loc = loc.get("display_name") or loc.get("name") or "Bengaluru, India"
+
+            emp_type = j.get("employment_type") or j.get("job_type") or j.get("type") or "Full-time"
+
+            rec = _job_record(
+                role_category=role_category,
+                company_name=comp,
+                job_title=title,
+                location=str(loc),
+                redirect_url=apply_link,
+                employment_type=str(emp_type),
+            )
+            rec["portal"] = j.get("portal") or "Jobvetta"
+            out.append(rec)
+    except requests.exceptions.Timeout:
+        _log(f"[Jobvetta] Request timed out for role: {role_category}")
+    except Exception as exc:
+        _log(f"[Jobvetta] {type(exc).__name__}: {exc!r}")
+    return out[:limit]
 
 
 # ==============================================================================
@@ -662,12 +769,18 @@ def fetch_adzuna_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[di
 def fetch_india_jobs_for_role(role_category: str, limit: int = JOBS_PER_ROLE) -> list[dict[str, Any]]:
     seen: set[str] = set()
     merged: list[dict[str, Any]] = []
-    if _is_real_key(RAPIDAPI_KEY) or (_is_real_key(ADZUNA_APP_ID) and _is_real_key(ADZUNA_APP_KEY)):
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [
-                pool.submit(fetch_jsearch_jobs, role_category, limit),
-                pool.submit(fetch_adzuna_jobs, role_category, limit),
-            ]
+
+    tasks = []
+    if _is_real_key(JOBVETTA_API_KEY):
+        tasks.append(fetch_jobvetta_jobs)
+    if _is_real_key(RAPIDAPI_KEY):
+        tasks.append(fetch_jsearch_jobs)
+    if _is_real_key(ADZUNA_APP_ID) and _is_real_key(ADZUNA_APP_KEY):
+        tasks.append(fetch_adzuna_jobs)
+
+    if tasks:
+        with ThreadPoolExecutor(max_workers=min(len(tasks), 3)) as pool:
+            futures = [pool.submit(fn, role_category, limit) for fn in tasks]
             for future in as_completed(futures):
                 try:
                     for job in future.result():
@@ -1646,8 +1759,8 @@ if _spa_build_path and _spa_index_file and _spa_index_file.is_file():
 _provider = jobs_provider_status()
 if not _provider["any_provider"]:
     _log(
-        "[jobs] No RAPIDAPI_KEY or ADZUNA_APP_ID/KEY in backend/.env — "
-        "live India job cards will stay empty until configured."
+        "[jobs] No JOBVETTA_API_KEY, RAPIDAPI_KEY, or ADZUNA credentials in backend/.env — "
+        "active verified portal application links (LinkedIn, Naukri, Indeed, Google Jobs) are serving opportunities."
     )
 
 if __name__ == "__main__":

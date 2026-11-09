@@ -14,6 +14,7 @@ services:
       - PORT=8000
       - APP_ENV=production
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - JOBVETTA_API_KEY=${JOBVETTA_API_KEY:-}
       - RAPIDAPI_KEY=${RAPIDAPI_KEY:-}
       - RAPIDAPI_HOST=${RAPIDAPI_HOST:-jsearch.p.rapidapi.com}
       - ADZUNA_APP_ID=${ADZUNA_APP_ID:-}
