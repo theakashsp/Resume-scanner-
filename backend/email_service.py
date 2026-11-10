@@ -189,3 +189,4 @@ PathFinder AI & Resume Analyzer Career Team
         "subject": subject,
         "preview": text_content[:200] + "...",
     }
+
