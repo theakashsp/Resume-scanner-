@@ -9,6 +9,27 @@ import re
 from typing import Any
 
 DOMAIN_PROFILES: dict[str, dict[str, Any]] = {
+    "VLSI & Semiconductor Engineering": {
+        "signals": (
+            "vlsi", "verilog", "systemverilog", "vhdl", "rtl", "asic", "fpga",
+            "physical design", "static timing analysis", "sta", "cadence", "synopsys",
+            "vivado", "xilinx", "risc-v", "soc", "signoff", "cmos", "digital electronics",
+            "microelectronics", "semiconductor", "drc", "lvs", "icarus verilog", "verilator",
+        ),
+        "roles": [
+            "VLSI Design Engineer (RTL / ASIC)",
+            "RTL Design & Verification Engineer",
+            "Digital Design & FPGA Engineer",
+            "ASIC Physical Design Engineer",
+            "Embedded Systems Engineer",
+        ],
+        "skill_pool": [
+            "Verilog HDL", "SystemVerilog", "RTL Design", "VLSI Design", "FPGA Design (Xilinx Vivado)",
+            "ASIC Design & Flow", "Static Timing Analysis (STA)", "Cadence EDA Tools", "Synopsys Design Tools",
+            "RISC-V Architecture", "Digital Electronics", "Low-Power CMOS", "Design Rule Checks (DRC)",
+            "Embedded C", "Microcontrollers",
+        ],
+    },
     "Cloud & DevOps": {
         "signals": (
             "aws", "azure", "gcp", "cloud", "devops", "kubernetes", "docker",
@@ -269,6 +290,9 @@ LANGUAGE_PATTERNS: list[tuple[str, re.Pattern, str]] = [
     ("html/css", re.compile(r"\b(?:html5?|css3?|html/css|html\s*&\s*css)\b", re.IGNORECASE), "HTML/CSS"),
     ("matlab", re.compile(r"\bmatlab\b", re.IGNORECASE), "MATLAB"),
     ("assembly", re.compile(r"\b(?:assembly|x86|arm\s+assembly)\b", re.IGNORECASE), "Assembly"),
+    ("verilog", re.compile(r"\b(?:verilog(?:\s*hdl)?|systemverilog|sv)\b", re.IGNORECASE), "Verilog HDL"),
+    ("vhdl", re.compile(r"\bvhdl\b", re.IGNORECASE), "VHDL"),
+    ("embedded c", re.compile(r"\bembedded\s*c(?:\+\+)?\b", re.IGNORECASE), "Embedded C/C++"),
 ]
 
 FRAMEWORK_PATTERNS: list[tuple[str, re.Pattern, str]] = [
@@ -321,6 +345,19 @@ TOOL_PATTERNS: list[tuple[str, re.Pattern, str]] = [
     ("tableau", re.compile(r"\btableau\b", re.IGNORECASE), "Tableau"),
     ("jira", re.compile(r"\bjira\b", re.IGNORECASE), "Jira / Agile"),
     ("figma", re.compile(r"\bfigma\b", re.IGNORECASE), "Figma"),
+    ("vlsi", re.compile(r"\bvlsi(?:\s+design)?\b", re.IGNORECASE), "VLSI Design"),
+    ("rtl", re.compile(r"\b(?:rtl\s+design|rtl)\b", re.IGNORECASE), "RTL Design"),
+    ("fpga", re.compile(r"\bfpga(?:\s+design)?\b", re.IGNORECASE), "FPGA Design"),
+    ("asic", re.compile(r"\basic(?:\s+design|\s+signoff|\s+flow)?\b", re.IGNORECASE), "ASIC Design"),
+    ("vivado", re.compile(r"\b(?:xilinx\s+vivado|vivado|artix|xilinx)\b", re.IGNORECASE), "Xilinx Vivado"),
+    ("cadence", re.compile(r"\bcadence(?:\s+virtuoso|\s+eda)?\b", re.IGNORECASE), "Cadence EDA"),
+    ("synopsys", re.compile(r"\bsynopsys\b", re.IGNORECASE), "Synopsys EDA"),
+    ("risc-v", re.compile(r"\brisc-?v\b", re.IGNORECASE), "RISC-V Architecture"),
+    ("sta", re.compile(r"\b(?:sta|static\s+timing\s+analysis)\b", re.IGNORECASE), "Static Timing Analysis (STA)"),
+    ("cmos", re.compile(r"\bcmos(?:\s+technology)?\b", re.IGNORECASE), "CMOS Technology"),
+    ("digital electronics", re.compile(r"\bdigital\s+electronics\b", re.IGNORECASE), "Digital Electronics"),
+    ("soc", re.compile(r"\bsoc(?:\s+design|\s+architecture|\s+signoff)?\b", re.IGNORECASE), "SoC Architecture"),
+    ("verilator", re.compile(r"\b(?:verilator|icarus\s*verilog)\b", re.IGNORECASE), "Verilator / Icarus Verilog"),
 ]
 
 SOFT_SKILL_PATTERNS: list[tuple[str, re.Pattern, str]] = [
@@ -805,6 +842,39 @@ def generate_multi_skill_career_tracks(
     tracks: list[dict[str, Any]] = []
     all_recommended_roles: list[str] = []
 
+    # 0. VLSI & Semiconductor Engineering Track
+    has_vlsi = any(s in skills_lower for s in (
+        "vlsi", "vlsi design", "verilog hdl", "verilog", "systemverilog", "vhdl",
+        "rtl design", "rtl", "asic design", "asic", "fpga design", "fpga",
+        "xilinx vivado", "cadence eda", "synopsys eda", "risc-v architecture",
+        "static timing analysis (sta)", "cmos technology", "soc architecture", "verilator / icarus verilog"
+    ))
+    if has_vlsi:
+        matched_in_track = [s for s in matched_skills if s.lower() in (
+            "verilog hdl", "systemverilog", "vhdl", "vlsi design", "rtl design",
+            "asic design", "fpga design", "xilinx vivado", "cadence eda", "synopsys eda",
+            "risc-v architecture", "static timing analysis (sta)", "cmos technology",
+            "digital electronics", "soc architecture", "embedded c/c++", "c", "c++", "matlab", "python"
+        )]
+        roles = [
+            "VLSI Design Engineer (RTL / ASIC)",
+            "RTL Design & Verification Engineer",
+            "Digital Design & FPGA Engineer",
+            "ASIC Physical Design Engineer",
+            "Embedded Systems Engineer",
+        ]
+        score = min(98, 82 + len(matched_in_track) * 4)
+        tracks.append({
+            "track_name": "VLSI, ASIC & Semiconductor Engineering",
+            "badge": "VLSI & Semiconductor",
+            "icon": "cpu",
+            "match_score": int(score),
+            "key_skills": matched_in_track or ["Verilog HDL", "RTL Design", "VLSI Design"],
+            "recommended_roles": roles,
+            "description": "Silicon chip design, RTL synthesis, ASIC flow, FPGA prototyping, and Static Timing Analysis.",
+        })
+        all_recommended_roles.extend(roles[:3])
+
     # 1. C & C++ Systems / Embedded Track
     has_c = any(s in skills_lower for s in ("c", "c++", "c/c++", "assembly", "embedded c"))
     if has_c:
@@ -1009,11 +1079,29 @@ def calculate_score_breakdown(
 
 def detect_domain(text: str) -> str:
     lower = text.lower()
+
+    # High-precision check for hardware / VLSI / Semiconductor engineering
+    vlsi_signals = (
+        "vlsi", "verilog", "systemverilog", "vhdl", "rtl design", "rtl", "asic",
+        "fpga", "physical design", "static timing analysis", "sta", "cadence",
+        "vivado", "xilinx", "risc-v", "microelectronics", "soc signoff", "soc design"
+    )
+    vlsi_hits = sum(1 for s in vlsi_signals if re.search(r"\b" + re.escape(s) + r"\b", lower))
+    if vlsi_hits >= 2:
+        return "VLSI & Semiconductor Engineering"
+
     scores: list[tuple[str, int]] = []
     for domain, profile in DOMAIN_PROFILES.items():
         if domain == "General / Fresher":
             continue
-        hits = sum(1 for sig in profile["signals"] if sig in lower)
+        hits = 0
+        for sig in profile["signals"]:
+            if len(sig) <= 2:
+                if re.search(r"\b" + re.escape(sig) + r"\b", lower):
+                    hits += 1
+            else:
+                if sig in lower:
+                    hits += 1
         scores.append((domain, hits))
     scores.sort(key=lambda item: item[1], reverse=True)
     if scores and scores[0][1] > 0:

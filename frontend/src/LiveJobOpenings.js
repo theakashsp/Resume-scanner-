@@ -1,7 +1,7 @@
 // ==============================================================================
 // TECH STACK: [React 19 & Lucide Icons] - Live Job Openings Interactive Dashboard
-// Displays live opportunities aggregated from Jobvetta / JSearch / Adzuna APIs
-// with 1-Click Smart Apply, resume auto-fill, and candidate screening dialog.
+// Displays live opportunities with CTC, Full-time/Internship badges, company branding,
+// direct multi-portal links (Indeed, LinkedIn, Naukri), and 1-Click Apply.
 // ==============================================================================
 import React, { useState, useMemo, useEffect } from 'react';
 import {
@@ -14,12 +14,148 @@ import {
   Sparkles,
   CheckCircle,
   Send,
+  Globe,
 } from 'lucide-react';
 import ApplyModal from './ApplyModal';
 import { apiService } from './api/client';
 
 function getCompanyBranding(name) {
   const lower = (name || '').toLowerCase();
+  if (lower.includes('jobsforce')) {
+    return {
+      gradient: 'linear-gradient(135deg, #064e3b 0%, #047857 50%, #10b981 100%)',
+      logoBg: '#10b981',
+      logoColor: '#ffffff',
+      abbr: 'JF',
+      cleanName: 'JobsForce India',
+    };
+  }
+  if (lower.includes('nvidia')) {
+    return {
+      gradient: 'linear-gradient(135deg, #0d2818 0%, #174d1a 50%, #76b900 100%)',
+      logoBg: '#76b900',
+      logoColor: '#0d2818',
+      abbr: 'NV',
+      cleanName: 'NVIDIA',
+    };
+  }
+  if (lower.includes('intel')) {
+    return {
+      gradient: 'linear-gradient(135deg, #001e50 0%, #004c97 50%, #0071c5 100%)',
+      logoBg: '#0071c5',
+      logoColor: '#ffffff',
+      abbr: 'IN',
+      cleanName: 'Intel',
+    };
+  }
+  if (lower.includes('qualcomm')) {
+    return {
+      gradient: 'linear-gradient(135deg, #07152b 0%, #0050d8 50%, #00a3e0 100%)',
+      logoBg: '#00a3e0',
+      logoColor: '#07152b',
+      abbr: 'QC',
+      cleanName: 'Qualcomm',
+    };
+  }
+  if (lower.includes('texas instruments') || lower.includes('ti ')) {
+    return {
+      gradient: 'linear-gradient(135deg, #18181b 0%, #991b1b 50%, #dc2626 100%)',
+      logoBg: '#dc2626',
+      logoColor: '#ffffff',
+      abbr: 'TI',
+      cleanName: 'Texas Instruments',
+    };
+  }
+  if (lower.includes('amd') || lower.includes('xilinx')) {
+    return {
+      gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #10b981 100%)',
+      logoBg: '#10b981',
+      logoColor: '#0f172a',
+      abbr: 'AMD',
+      cleanName: 'AMD',
+    };
+  }
+  if (lower.includes('synopsys')) {
+    return {
+      gradient: 'linear-gradient(135deg, #2e0854 0%, #6320ee 50%, #802bb1 100%)',
+      logoBg: '#802bb1',
+      logoColor: '#ffffff',
+      abbr: 'SN',
+      cleanName: 'Synopsys',
+    };
+  }
+  if (lower.includes('cadence')) {
+    return {
+      gradient: 'linear-gradient(135deg, #1c1917 0%, #c2410c 50%, #ea580c 100%)',
+      logoBg: '#ea580c',
+      logoColor: '#ffffff',
+      abbr: 'CD',
+      cleanName: 'Cadence Design Systems',
+    };
+  }
+  if (lower.includes('mediatek')) {
+    return {
+      gradient: 'linear-gradient(135deg, #0c2340 0%, #ea580c 50%, #f97316 100%)',
+      logoBg: '#f97316',
+      logoColor: '#0c2340',
+      abbr: 'MT',
+      cleanName: 'MediaTek',
+    };
+  }
+  if (lower.includes('broadcom')) {
+    return {
+      gradient: 'linear-gradient(135deg, #1e1b4b 0%, #b91c1c 50%, #dc2626 100%)',
+      logoBg: '#dc2626',
+      logoColor: '#ffffff',
+      abbr: 'BC',
+      cleanName: 'Broadcom',
+    };
+  }
+  if (lower.includes('bosch')) {
+    return {
+      gradient: 'linear-gradient(135deg, #0f172a 0%, #0284c7 50%, #e11d48 100%)',
+      logoBg: '#e11d48',
+      logoColor: '#ffffff',
+      abbr: 'RB',
+      cleanName: 'Bosch',
+    };
+  }
+  if (lower.includes('nxp')) {
+    return {
+      gradient: 'linear-gradient(135deg, #0f172a 0%, #2563eb 50%, #38bdf8 100%)',
+      logoBg: '#38bdf8',
+      logoColor: '#0f172a',
+      abbr: 'NXP',
+      cleanName: 'NXP Semiconductors',
+    };
+  }
+  if (lower.includes('microchip')) {
+    return {
+      gradient: 'linear-gradient(135deg, #1c1917 0%, #b91c1c 50%, #ef4444 100%)',
+      logoBg: '#ef4444',
+      logoColor: '#ffffff',
+      abbr: 'MC',
+      cleanName: 'Microchip Technology',
+    };
+  }
+  if (lower.includes('revolite')) {
+    return {
+      gradient: 'linear-gradient(135deg, #1e1b4b 0%, #4338ca 50%, #6366f1 100%)',
+      logoBg: '#6366f1',
+      logoColor: '#ffffff',
+      abbr: 'RV',
+      cleanName: 'Revolite Infotech',
+    };
+  }
+  if (lower.includes('sataware')) {
+    return {
+      gradient: 'linear-gradient(135deg, #3b0764 0%, #7e22ce 50%, #a855f7 100%)',
+      logoBg: '#a855f7',
+      logoColor: '#ffffff',
+      abbr: 'ST',
+      cleanName: 'Sataware Technologies',
+    };
+  }
   if (lower.includes('amazon') || lower.includes('aws')) {
     return {
       gradient: 'linear-gradient(135deg, #131921 0%, #232f3e 60%, #ff9900 100%)',
@@ -27,24 +163,6 @@ function getCompanyBranding(name) {
       logoColor: '#131921',
       abbr: 'a',
       cleanName: lower.includes('aws') ? 'Amazon Web Services (AWS)' : 'Amazon',
-    };
-  }
-  if (lower.includes('zomato')) {
-    return {
-      gradient: 'linear-gradient(135deg, #b91c1c 0%, #e11d48 60%, #991b1b 100%)',
-      logoBg: '#ffffff',
-      logoColor: '#e11d48',
-      abbr: 'Z',
-      cleanName: 'Zomato',
-    };
-  }
-  if (lower.includes('swiggy')) {
-    return {
-      gradient: 'linear-gradient(135deg, #ea580c 0%, #f97316 60%, #c2410c 100%)',
-      logoBg: '#ffffff',
-      logoColor: '#ea580c',
-      abbr: 'S',
-      cleanName: 'Swiggy',
     };
   }
   if (lower.includes('google')) {
@@ -74,15 +192,6 @@ function getCompanyBranding(name) {
       cleanName: 'Flipkart',
     };
   }
-  if (lower.includes('cred')) {
-    return {
-      gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #334155 100%)',
-      logoBg: '#ffffff',
-      logoColor: '#0f172a',
-      abbr: 'CR',
-      cleanName: 'CRED',
-    };
-  }
   if (lower.includes('razorpay')) {
     return {
       gradient: 'linear-gradient(135deg, #0c2340 0%, #0284c7 60%, #00baf2 100%)',
@@ -92,6 +201,15 @@ function getCompanyBranding(name) {
       cleanName: 'Razorpay',
     };
   }
+  if (lower.includes('cred')) {
+    return {
+      gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #334155 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#0f172a',
+      abbr: 'CR',
+      cleanName: 'CRED',
+    };
+  }
   if (lower.includes('phonepe')) {
     return {
       gradient: 'linear-gradient(135deg, #581c87 0%, #6d28d9 60%, #7c3aed 100%)',
@@ -99,6 +217,24 @@ function getCompanyBranding(name) {
       logoColor: '#581c87',
       abbr: 'Pe',
       cleanName: 'PhonePe',
+    };
+  }
+  if (lower.includes('uber')) {
+    return {
+      gradient: 'linear-gradient(135deg, #000000 0%, #1f2937 60%, #4b5563 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#000000',
+      abbr: 'Ub',
+      cleanName: 'Uber',
+    };
+  }
+  if (lower.includes('intuit')) {
+    return {
+      gradient: 'linear-gradient(135deg, #004c97 0%, #0077c5 50%, #055499 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#0077c5',
+      abbr: 'IN',
+      cleanName: 'Intuit',
     };
   }
   if (lower.includes('infosys')) {
@@ -119,6 +255,24 @@ function getCompanyBranding(name) {
       cleanName: 'TCS',
     };
   }
+  if (lower.includes('zomato')) {
+    return {
+      gradient: 'linear-gradient(135deg, #b91c1c 0%, #e11d48 60%, #991b1b 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#e11d48',
+      abbr: 'Z',
+      cleanName: 'Zomato',
+    };
+  }
+  if (lower.includes('swiggy')) {
+    return {
+      gradient: 'linear-gradient(135deg, #ea580c 0%, #f97316 60%, #c2410c 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#ea580c',
+      abbr: 'S',
+      cleanName: 'Swiggy',
+    };
+  }
 
   const clean = name.replace(/\b(careers|jobs|network|partners|india|limited|ltd|pvt)\b/gi, '').trim() || name;
   return {
@@ -137,11 +291,22 @@ function normalizeJob(job) {
   const branding = getCompanyBranding(rawCompany);
   const company = branding.cleanName || rawCompany;
   const location = job.location || 'India';
+  const salaryRange = job.salary_range || 'Competitive CTC';
+  const employmentType = job.job_employment_type || job.employment_type || 'Full-time';
 
   let url = String(job.redirect_url || job.job_apply_link || job.link || '').trim();
   if (!url || url === '#' || !url.startsWith('http')) {
     url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(`${company} ${title}`)}&location=India`;
   }
+
+  const query = encodeURIComponent(`${company} ${title}`);
+  const roleSlug = encodeURIComponent(role.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+  const searchLinks = {
+    indeed: job.search_links?.indeed || `https://in.indeed.com/jobs?q=${query}&l=India`,
+    linkedin: job.search_links?.linkedin || `https://www.linkedin.com/jobs/search/?keywords=${query}&location=India`,
+    naukri: job.search_links?.naukri || `https://www.naukri.com/${roleSlug}-jobs-in-india?k=${query}`,
+    official: url,
+  };
 
   return {
     role_category: role,
@@ -149,8 +314,10 @@ function normalizeJob(job) {
     job_title: title,
     location: location,
     redirect_url: url,
-    job_employment_type: job.job_employment_type || job.type || 'Full-time',
-    portal: 'Official Company Web',
+    salary_range: salaryRange,
+    job_employment_type: employmentType,
+    portal: job.portal || 'Official Company Web',
+    search_links: searchLinks,
   };
 }
 
@@ -163,13 +330,13 @@ function JobCard({ job, index, onApplyClick, isApplied }) {
       {/* Branded Company Header Banner */}
       <div
         className="tw-property-card__thumb position-relative d-flex flex-column align-items-center justify-content-center p-3 text-white"
-        style={{ background: branding.gradient, minHeight: '140px' }}
+        style={{ background: branding.gradient, minHeight: '135px' }}
       >
         <div
           className="d-flex align-items-center justify-content-center rounded-3 shadow mb-1"
           style={{
-            width: '42px',
-            height: '42px',
+            width: '44px',
+            height: '44px',
             background: branding.logoBg,
             color: branding.logoColor,
             fontWeight: 800,
@@ -185,41 +352,87 @@ function JobCard({ job, index, onApplyClick, isApplied }) {
         <div className="badge bg-white bg-opacity-25 text-white mt-1" style={{ fontSize: '0.68rem', fontWeight: 500 }}>
           Official Direct Opening
         </div>
-        <span className="tw-property-card__badge">{j.job_employment_type}</span>
+        <span className="tw-property-card__badge shadow-sm" style={{ fontWeight: 600 }}>
+          {j.job_employment_type}
+        </span>
       </div>
 
-      <div className="tw-property-card__body d-flex flex-column justify-content-between" style={{ minHeight: '265px' }}>
+      <div className="tw-property-card__body d-flex flex-column justify-content-between" style={{ minHeight: '300px' }}>
         <div>
           <div className="d-flex justify-content-between align-items-center mb-2">
             <p className="tw-property-card__category mb-0">{j.role_category}</p>
             <span className="badge bg-success-subtle text-success border border-success px-2 py-1" style={{ fontSize: '0.7rem', fontWeight: 600 }}>
-              ✓ Official Web
+              ✓ Verified Hiring
             </span>
           </div>
 
-          <h4 className="tw-property-card__title mb-2" title={j.job_title} style={{ minHeight: '44px' }}>
+          <h4 className="tw-property-card__title mb-2" title={j.job_title} style={{ minHeight: '44px', fontSize: '1rem', lineHeight: '1.35' }}>
             {j.job_title}
           </h4>
 
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <span className="badge bg-primary text-white px-2 py-1 fw-bold fs-6 d-inline-flex align-items-center gap-1 shadow-sm">
+          {/* Company & CTC Badge Row */}
+          <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span className="badge bg-dark text-white px-2 py-1 fw-bold fs-6 d-inline-flex align-items-center gap-1 shadow-sm">
               <Building2 size={13} />
               {j.company_name}
             </span>
-            <span className="badge bg-light text-secondary border">Direct Hire</span>
+            <span className="badge bg-warning-subtle text-dark border border-warning px-2 py-1 fw-bold fs-6 shadow-sm" title="Estimated CTC Package">
+              💰 {j.salary_range}
+            </span>
           </div>
 
-          <p className="tw-property-card__location text-muted mb-3">
-            <MapPin size={14} className="me-1 text-danger" style={{ display: 'inline' }} />
+          <p className="tw-property-card__location text-muted mb-2 small">
+            <MapPin size={13} className="me-1 text-danger" style={{ display: 'inline' }} />
             {j.location}
           </p>
+
+          {/* Multi-Portal 1-Click Search Links */}
+          <div className="p-2 mb-2 rounded bg-light border">
+            <div className="d-flex align-items-center justify-content-between mb-1">
+              <span className="text-muted" style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Search this role on:
+              </span>
+            </div>
+            <div className="d-flex gap-1 flex-wrap">
+              <a
+                href={j.search_links.indeed}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-sm btn-outline-info py-0 px-2 text-decoration-none"
+                style={{ fontSize: '0.72rem', fontWeight: 600 }}
+                title={`Search ${j.company_name} on Indeed India`}
+              >
+                Indeed ↗
+              </a>
+              <a
+                href={j.search_links.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-sm btn-outline-primary py-0 px-2 text-decoration-none"
+                style={{ fontSize: '0.72rem', fontWeight: 600 }}
+                title={`Search ${j.company_name} on LinkedIn`}
+              >
+                LinkedIn ↗
+              </a>
+              <a
+                href={j.search_links.naukri}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-sm btn-outline-secondary py-0 px-2 text-decoration-none"
+                style={{ fontSize: '0.72rem', fontWeight: 600 }}
+                title={`Search ${j.company_name} on Naukri`}
+              >
+                Naukri ↗
+              </a>
+            </div>
+          </div>
         </div>
 
-        <div className="tw-property-card__footer mt-3 d-flex flex-column gap-2">
+        <div className="tw-property-card__footer mt-2 d-flex flex-column gap-2">
           {isApplied ? (
             <button
               type="button"
-              className="btn btn-sm btn-success w-100 d-inline-flex align-items-center justify-content-center gap-1"
+              className="btn btn-sm btn-success w-100 d-inline-flex align-items-center justify-content-center gap-1 shadow-sm"
               disabled
             >
               <CheckCircle size={14} />
@@ -228,7 +441,7 @@ function JobCard({ job, index, onApplyClick, isApplied }) {
           ) : (
             <button
               type="button"
-              className="btn btn-sm btn-primary tw-btn-primary w-100 d-inline-flex align-items-center justify-content-center gap-1 shadow-sm"
+              className="btn btn-sm btn-primary tw-btn-primary w-100 d-inline-flex align-items-center justify-content-center gap-1 shadow-sm fw-bold"
               onClick={() => onApplyClick(j)}
             >
               <Send size={13} />
@@ -241,8 +454,8 @@ function JobCard({ job, index, onApplyClick, isApplied }) {
               href={j.redirect_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn-sm btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-1 text-decoration-none"
-              style={{ fontSize: '0.78rem' }}
+              className="btn btn-sm btn-outline-dark w-100 d-inline-flex align-items-center justify-content-center gap-1 text-decoration-none"
+              style={{ fontSize: '0.76rem', fontWeight: 500 }}
             >
               <span>Visit {j.company_name} Official Career Web</span>
               <ExternalLink size={12} />
@@ -255,12 +468,50 @@ function JobCard({ job, index, onApplyClick, isApplied }) {
 }
 
 function RoleJobGroup({ roleName, jobs, onApplyClick, appliedJobs = {} }) {
+  const roleSlug = encodeURIComponent(roleName.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+  const encRole = encodeURIComponent(roleName);
+
   return (
     <section className="tw-listing-group mb-4">
-      <div className="tw-listing-group__head d-flex justify-content-between align-items-center mb-3">
-        <h3 className="tw-listing-group__title mb-0">{roleName}</h3>
-        <span className="tw-listing-group__count badge bg-light text-dark border">{(jobs || []).length} openings</span>
+      <div className="tw-listing-group__head d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+          <h3 className="tw-listing-group__title mb-0 d-inline-block me-2">{roleName}</h3>
+          <span className="tw-listing-group__count badge bg-light text-dark border">
+            {(jobs || []).length} active openings
+          </span>
+        </div>
+        {/* Quick Portal Search Bar for this Role */}
+        <div className="d-flex flex-wrap gap-1">
+          <a
+            href={`https://in.indeed.com/jobs?q=${encRole}&l=India`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm btn-outline-info py-1 px-2"
+            style={{ fontSize: '0.74rem' }}
+          >
+            Indeed India ↗
+          </a>
+          <a
+            href={`https://www.linkedin.com/jobs/search/?keywords=${encRole}&location=India`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm btn-outline-primary py-1 px-2"
+            style={{ fontSize: '0.74rem' }}
+          >
+            LinkedIn ↗
+          </a>
+          <a
+            href={`https://www.naukri.com/${roleSlug}-jobs-in-india`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm btn-outline-secondary py-1 px-2"
+            style={{ fontSize: '0.74rem' }}
+          >
+            Naukri ↗
+          </a>
+        </div>
       </div>
+
       <div className="row g-4">
         {(jobs || []).length > 0 ? (
           jobs.map((job, i) => {
@@ -281,31 +532,32 @@ function RoleJobGroup({ roleName, jobs, onApplyClick, appliedJobs = {} }) {
         ) : (
           <div className="col-12">
             <div className="tw-listing-empty p-4 text-center text-muted border rounded bg-light">
-              <p className="mb-2">No matching openings for this role with the selected filters.</p>
-              <div className="d-flex flex-wrap justify-content-center gap-2 mt-3">
+              <p className="mb-2 fw-medium">No matching openings for this role with the selected filters.</p>
+              <p className="small text-muted mb-3">Explore live listings directly across top hiring portals for {roleName}:</p>
+              <div className="d-flex flex-wrap justify-content-center gap-2">
                 <a
-                  href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(roleName)}&location=India`}
+                  href={`https://in.indeed.com/jobs?q=${encRole}&l=India`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-sm btn-outline-primary"
+                  className="btn btn-sm btn-outline-info px-3"
+                >
+                  Search on Indeed India
+                </a>
+                <a
+                  href={`https://www.linkedin.com/jobs/search/?keywords=${encRole}&location=India`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm btn-outline-primary px-3"
                 >
                   Search on LinkedIn
                 </a>
                 <a
-                  href={`https://www.naukri.com/${encodeURIComponent(roleName).toLowerCase().replace(/[^a-z0-9]+/g, '-')}-jobs-in-india`}
+                  href={`https://www.naukri.com/${roleSlug}-jobs-in-india`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-sm btn-outline-secondary"
+                  className="btn btn-sm btn-outline-secondary px-3"
                 >
-                  Search on Naukri
-                </a>
-                <a
-                  href={`https://in.indeed.com/jobs?q=${encodeURIComponent(roleName)}&l=India`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-sm btn-outline-info"
-                >
-                  Search on Indeed
+                  Search on Naukri.com
                 </a>
               </div>
             </div>
@@ -409,30 +661,62 @@ export default function LiveJobOpenings({
       <div className="tw-section-head text-center mb-4">
         <div className="d-inline-flex align-items-center gap-1 tw-section-label mb-2">
           <Sparkles size={16} />
-          <span>India Job Network</span>
+          <span>India Top Tech &amp; Hardware Network</span>
         </div>
         <h3 className="tw-section-title">{title}</h3>
         <p className="tw-section-sub">
           {subtitle || (totalJobs > 0
-            ? `${totalJobs} verified openings matched across LinkedIn, Naukri, Indeed & top employers`
+            ? `${totalJobs} verified openings with CTC, Full-time badges & 1-click links to Indeed, LinkedIn, Naukri & official company career portals`
             : 'Real-time verified India job search')}
         </p>
-        {onOpenApplications && (
-          <div className="mt-2">
+
+        {/* Global Multi-Portal Quick Exploration Bar */}
+        <div className="d-flex flex-wrap justify-content-center gap-2 mt-2 mb-3">
+          <a
+            href="https://in.indeed.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm btn-outline-info d-inline-flex align-items-center gap-1 shadow-sm px-3"
+            style={{ borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600 }}
+          >
+            <Globe size={13} />
+            <span>Indeed India ↗</span>
+          </a>
+          <a
+            href="https://www.linkedin.com/jobs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 shadow-sm px-3"
+            style={{ borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600 }}
+          >
+            <Globe size={13} />
+            <span>LinkedIn Jobs ↗</span>
+          </a>
+          <a
+            href="https://www.naukri.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 shadow-sm px-3"
+            style={{ borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600 }}
+          >
+            <Globe size={13} />
+            <span>Naukri.com ↗</span>
+          </a>
+          {onOpenApplications && (
             <button
               type="button"
-              className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 shadow-sm px-3"
-              style={{ borderRadius: '20px' }}
+              className="btn btn-sm btn-success d-inline-flex align-items-center gap-1 shadow-sm px-3 text-white"
+              style={{ borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600 }}
               onClick={onOpenApplications}
             >
-              <Briefcase size={14} />
+              <Briefcase size={13} />
               <span>Applied Jobs Tracker</span>
-              <span className="badge bg-primary text-white ms-1 rounded-pill" style={{ fontSize: '0.72rem' }}>
+              <span className="badge bg-white text-success ms-1 rounded-pill" style={{ fontSize: '0.72rem' }}>
                 {Object.keys(appliedJobs).length}
               </span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -446,7 +730,7 @@ export default function LiveJobOpenings({
               <input
                 type="text"
                 className="form-control border-start-0"
-                placeholder="Search job title or company..."
+                placeholder="Search job title or company (e.g. NVIDIA, Intel, Qualcomm)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />

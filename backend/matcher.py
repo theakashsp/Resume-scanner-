@@ -96,16 +96,24 @@ def _load_ml_model():
 
 def predict_role_with_ml(text: str) -> str | None:
     """
-    Predict job role using the trained TF-IDF Logistic Regression ML model.
+    Predict job role using trained TF-IDF Logistic Regression ML model
+    with high-precision domain overrides for specialized fields (e.g. VLSI, RTL, Embedded).
     Returns None safely if model artifacts are missing or unreadable.
     """
+    cleaned = text.strip()
+    if not cleaned:
+        return None
+
+    lower = cleaned.lower()
+    # High-precision hardware / VLSI engineering override
+    vlsi_signals = ("vlsi", "verilog", "systemverilog", "vhdl", "rtl design", "asic", "fpga", "physical design", "vivado", "cadence", "risc-v")
+    if sum(1 for s in vlsi_signals if re.search(r"\b" + re.escape(s) + r"\b", lower)) >= 2:
+        return "VLSI Design Engineer (RTL / ASIC)"
+
     model, vectorizer = _load_ml_model()
     if model is None or vectorizer is None:
         return None
     try:
-        cleaned = text.strip()
-        if not cleaned:
-            return None
         features = vectorizer.transform([cleaned])
         predicted = model.predict(features)
         if len(predicted) > 0 and predicted[0]:
