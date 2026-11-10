@@ -18,24 +18,130 @@ import {
 import ApplyModal from './ApplyModal';
 import { apiService } from './api/client';
 
+function getCompanyBranding(name) {
+  const lower = (name || '').toLowerCase();
+  if (lower.includes('amazon') || lower.includes('aws')) {
+    return {
+      gradient: 'linear-gradient(135deg, #131921 0%, #232f3e 60%, #ff9900 100%)',
+      logoBg: '#ff9900',
+      logoColor: '#131921',
+      abbr: 'a',
+      cleanName: lower.includes('aws') ? 'Amazon Web Services (AWS)' : 'Amazon',
+    };
+  }
+  if (lower.includes('zomato')) {
+    return {
+      gradient: 'linear-gradient(135deg, #b91c1c 0%, #e11d48 60%, #991b1b 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#e11d48',
+      abbr: 'Z',
+      cleanName: 'Zomato',
+    };
+  }
+  if (lower.includes('swiggy')) {
+    return {
+      gradient: 'linear-gradient(135deg, #ea580c 0%, #f97316 60%, #c2410c 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#ea580c',
+      abbr: 'S',
+      cleanName: 'Swiggy',
+    };
+  }
+  if (lower.includes('google')) {
+    return {
+      gradient: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #4285f4 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#2563eb',
+      abbr: 'G',
+      cleanName: 'Google',
+    };
+  }
+  if (lower.includes('microsoft')) {
+    return {
+      gradient: 'linear-gradient(135deg, #0078d4 0%, #005a9e 60%, #002050 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#0078d4',
+      abbr: 'MS',
+      cleanName: 'Microsoft',
+    };
+  }
+  if (lower.includes('flipkart')) {
+    return {
+      gradient: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 60%, #f59e0b 100%)',
+      logoBg: '#f59e0b',
+      logoColor: '#1d4ed8',
+      abbr: 'Fk',
+      cleanName: 'Flipkart',
+    };
+  }
+  if (lower.includes('cred')) {
+    return {
+      gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #334155 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#0f172a',
+      abbr: 'CR',
+      cleanName: 'CRED',
+    };
+  }
+  if (lower.includes('razorpay')) {
+    return {
+      gradient: 'linear-gradient(135deg, #0c2340 0%, #0284c7 60%, #00baf2 100%)',
+      logoBg: '#00baf2',
+      logoColor: '#0c2340',
+      abbr: 'Rz',
+      cleanName: 'Razorpay',
+    };
+  }
+  if (lower.includes('phonepe')) {
+    return {
+      gradient: 'linear-gradient(135deg, #581c87 0%, #6d28d9 60%, #7c3aed 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#581c87',
+      abbr: 'Pe',
+      cleanName: 'PhonePe',
+    };
+  }
+  if (lower.includes('infosys')) {
+    return {
+      gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 60%, #075985 100%)',
+      logoBg: '#ffffff',
+      logoColor: '#0284c7',
+      abbr: 'Inf',
+      cleanName: 'Infosys',
+    };
+  }
+  if (lower.includes('tcs')) {
+    return {
+      gradient: 'linear-gradient(135deg, #1e293b 0%, #334155 60%, #0f172a 100%)',
+      logoBg: '#3b82f6',
+      logoColor: '#ffffff',
+      abbr: 'TCS',
+      cleanName: 'TCS',
+    };
+  }
+
+  const clean = name.replace(/\b(careers|jobs|network|partners|india|limited|ltd|pvt)\b/gi, '').trim() || name;
+  return {
+    gradient: 'linear-gradient(135deg, #1e293b 0%, #2563eb 100%)',
+    logoBg: '#ffffff',
+    logoColor: '#1e293b',
+    abbr: clean.slice(0, 2).toUpperCase(),
+    cleanName: clean,
+  };
+}
+
 function normalizeJob(job) {
   const role = job.role_category || 'Software Professional';
   const title = job.job_title || job.title || role;
-  const company = job.company_name || job.employer_name || 'Hiring Company';
+  let rawCompany = job.company_name || job.employer_name || 'Hiring Company';
+  const branding = getCompanyBranding(rawCompany);
+  const company = branding.cleanName || rawCompany;
   const location = job.location || 'India';
 
   let url = String(job.redirect_url || job.job_apply_link || job.link || '').trim();
   if (!url || url === '#' || !url.startsWith('http')) {
-    url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(`${title} ${company}`)}&location=India`;
+    url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(`${company} ${title}`)}&location=India`;
   }
-
-  let portal = job.portal || 'Direct Apply';
-  const lower = url.toLowerCase();
-  if (lower.includes('linkedin')) portal = 'LinkedIn';
-  else if (lower.includes('naukri')) portal = 'Naukri';
-  else if (lower.includes('indeed')) portal = 'Indeed';
-  else if (lower.includes('foundit')) portal = 'Foundit';
-  else if (lower.includes('google')) portal = 'Google Jobs';
 
   return {
     role_category: role,
@@ -44,37 +150,70 @@ function normalizeJob(job) {
     location: location,
     redirect_url: url,
     job_employment_type: job.job_employment_type || job.type || 'Full-time',
-    portal: portal,
+    portal: 'Official Company Web',
   };
 }
 
 function JobCard({ job, index, onApplyClick, isApplied }) {
   const j = normalizeJob(job);
+  const branding = getCompanyBranding(j.company_name);
 
   return (
     <article className="tw-property-card" style={{ animationDelay: `${index * 60}ms` }}>
-      <div className="tw-property-card__thumb">
-        <div className="tw-property-card__thumb-inner">
-          <Building2 size={32} strokeWidth={1.75} />
+      {/* Branded Company Header Banner */}
+      <div
+        className="tw-property-card__thumb position-relative d-flex flex-column align-items-center justify-content-center p-3 text-white"
+        style={{ background: branding.gradient, minHeight: '140px' }}
+      >
+        <div
+          className="d-flex align-items-center justify-content-center rounded-3 shadow mb-1"
+          style={{
+            width: '42px',
+            height: '42px',
+            background: branding.logoBg,
+            color: branding.logoColor,
+            fontWeight: 800,
+            fontSize: '1.05rem',
+            border: '2px solid rgba(255, 255, 255, 0.4)',
+          }}
+        >
+          {branding.abbr}
+        </div>
+        <div className="fw-bold fs-5 text-white text-center text-truncate w-100 px-2" title={j.company_name}>
+          {j.company_name}
+        </div>
+        <div className="badge bg-white bg-opacity-25 text-white mt-1" style={{ fontSize: '0.68rem', fontWeight: 500 }}>
+          Official Direct Opening
         </div>
         <span className="tw-property-card__badge">{j.job_employment_type}</span>
       </div>
-      <div className="tw-property-card__body">
-        <div className="d-flex justify-content-between align-items-center mb-1">
-          <p className="tw-property-card__category mb-0">{j.role_category}</p>
-          <span className="badge bg-secondary text-light px-2 py-1" style={{ fontSize: '0.7rem', fontWeight: 500, borderRadius: '4px' }}>
-            {j.portal}
-          </span>
+
+      <div className="tw-property-card__body d-flex flex-column justify-content-between" style={{ minHeight: '265px' }}>
+        <div>
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <p className="tw-property-card__category mb-0">{j.role_category}</p>
+            <span className="badge bg-success-subtle text-success border border-success px-2 py-1" style={{ fontSize: '0.7rem', fontWeight: 600 }}>
+              ✓ Official Web
+            </span>
+          </div>
+
+          <h4 className="tw-property-card__title mb-2" title={j.job_title} style={{ minHeight: '44px' }}>
+            {j.job_title}
+          </h4>
+
+          <div className="d-flex align-items-center gap-2 mb-2">
+            <span className="badge bg-primary text-white px-2 py-1 fw-bold fs-6 d-inline-flex align-items-center gap-1 shadow-sm">
+              <Building2 size={13} />
+              {j.company_name}
+            </span>
+            <span className="badge bg-light text-secondary border">Direct Hire</span>
+          </div>
+
+          <p className="tw-property-card__location text-muted mb-3">
+            <MapPin size={14} className="me-1 text-danger" style={{ display: 'inline' }} />
+            {j.location}
+          </p>
         </div>
-        <h4 className="tw-property-card__title" title={j.job_title}>{j.job_title}</h4>
-        <p className="tw-property-card__company">
-          <Briefcase size={14} className="me-1 text-primary" />
-          {j.company_name}
-        </p>
-        <p className="tw-property-card__location">
-          <MapPin size={14} className="me-1 text-danger" />
-          {j.location}
-        </p>
 
         <div className="tw-property-card__footer mt-3 d-flex flex-column gap-2">
           {isApplied ? (
@@ -84,7 +223,7 @@ function JobCard({ job, index, onApplyClick, isApplied }) {
               disabled
             >
               <CheckCircle size={14} />
-              <span>✓ Applied</span>
+              <span>✓ Applied &amp; Tracked</span>
             </button>
           ) : (
             <button
@@ -102,11 +241,11 @@ function JobCard({ job, index, onApplyClick, isApplied }) {
               href={j.redirect_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-center text-muted small text-decoration-none d-inline-flex align-items-center justify-content-center gap-1"
-              style={{ fontSize: '0.75rem' }}
+              className="btn btn-sm btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-1 text-decoration-none"
+              style={{ fontSize: '0.78rem' }}
             >
-              <span>View direct posting on {j.portal}</span>
-              <ExternalLink size={11} />
+              <span>Visit {j.company_name} Official Career Web</span>
+              <ExternalLink size={12} />
             </a>
           )}
         </div>

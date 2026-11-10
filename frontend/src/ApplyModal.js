@@ -89,6 +89,15 @@ export default function ApplyModal({
       const res = await apiService.applyToJob(payload);
       setSubmitted(true);
       onApplySuccess?.(job, res);
+
+      // Automatically launch Company Official Career Web in new tab
+      if (job.redirect_url && job.redirect_url.startsWith('http')) {
+        try {
+          window.open(job.redirect_url, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+          console.warn('Popup blocked:', e);
+        }
+      }
     } catch (err) {
       setError(formatAuthError(err) || 'Failed to submit application. Please try again.');
     } finally {
@@ -336,35 +345,46 @@ export default function ApplyModal({
             <div className="mb-3">
               <CheckCircle size={56} className="text-success mx-auto" />
             </div>
-            <h4 className="fw-bold text-dark mb-2">Application Submitted!</h4>
-            <p className="text-muted small mb-4 px-3">
-              Your resume details, contact info, and screening answers have been recorded and saved in your applicant tracking profile.
+            <h4 className="fw-bold text-dark mb-1">Application Submitted &amp; Forwarded!</h4>
+            <p className="text-muted small mb-3 px-3">
+              Your resume details and screening pitch have been logged into your PathFinder AI tracker, an email confirmation was dispatched to <strong>{email}</strong>, and <strong>{job.company_name}</strong>'s official career application webpage has been launched in a new tab!
             </p>
 
-            <div className="p-3 bg-light rounded text-start mb-4 mx-auto" style={{ maxWidth: '480px' }}>
+            <div className="p-3 bg-light rounded text-start mb-4 mx-auto" style={{ maxWidth: '520px' }}>
               <div className="d-flex justify-content-between mb-1">
                 <span className="text-muted small">Position:</span>
                 <span className="fw-semibold small">{job.job_title}</span>
               </div>
               <div className="d-flex justify-content-between mb-1">
                 <span className="text-muted small">Company:</span>
-                <span className="fw-semibold small">{job.company_name}</span>
+                <span className="fw-bold text-primary small">🏢 {job.company_name}</span>
               </div>
               <div className="d-flex justify-content-between mb-1">
-                <span className="text-muted small">Status:</span>
-                <span className="badge bg-success text-light">✓ Applied &amp; Tracked</span>
+                <span className="text-muted small">PathFinder AI Tracker:</span>
+                <span className="badge bg-success text-light">✓ Saved in Database</span>
               </div>
               <div className="d-flex justify-content-between mb-1">
                 <span className="text-muted small">Confirmation Email:</span>
-                <span className="badge bg-info text-light">✓ Sent to {email}</span>
+                <span className="badge bg-info text-light">✓ Dispatched to {email}</span>
               </div>
               <div className="d-flex justify-content-between">
-                <span className="text-muted small">Notice / CTC:</span>
-                <span className="small text-dark">{noticePeriod} • {expectedCtc}</span>
+                <span className="text-muted small">Company Official Web:</span>
+                <span className="badge bg-secondary text-light">✓ Opened in New Tab</span>
               </div>
             </div>
 
             <div className="d-flex flex-wrap justify-content-center gap-2">
+              {job.redirect_url && (
+                <a
+                  href={job.redirect_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm btn-primary tw-btn-primary d-inline-flex align-items-center gap-2 px-3 shadow"
+                >
+                  <ExternalLink size={14} />
+                  <span>Go to {job.company_name} Official Career Web</span>
+                </a>
+              )}
               <button
                 type="button"
                 className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1"
@@ -376,20 +396,9 @@ export default function ApplyModal({
                 <Sparkles size={13} />
                 <span>View in Applied Jobs Tracker</span>
               </button>
-              {job.redirect_url && (
-                <a
-                  href={job.redirect_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
-                >
-                  <span>Open {job.portal || 'Employer Portal'}</span>
-                  <ExternalLink size={13} />
-                </a>
-              )}
               <button
                 type="button"
-                className="btn btn-sm btn-primary tw-btn-primary px-4"
+                className="btn btn-sm btn-secondary px-3"
                 onClick={onClose}
               >
                 Done
