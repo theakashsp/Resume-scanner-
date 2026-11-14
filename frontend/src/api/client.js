@@ -220,8 +220,10 @@ export const apiService = {
     return res.data;
   },
 
-  async getAppliedJobs() {
-    const res = await apiClient.get('/api/jobs/applied');
+  async getAppliedJobs(email = '') {
+    const res = await apiClient.get('/api/jobs/applied', {
+      params: email ? { email } : {},
+    });
     return res.data;
   },
 

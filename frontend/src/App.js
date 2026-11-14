@@ -488,16 +488,30 @@ function App() {
   const [exploreLoading, setExploreLoading] = useState(false);
   const [showApplicationsModal, setShowApplicationsModal] = useState(false);
   const [appliedJobsCount, setAppliedJobsCount] = useState(0);
+  const [appliedJobsMap, setAppliedJobsMap] = useState({});
 
-  const refreshAppliedCount = () => {
-    apiService.getAppliedJobs()
+  const refreshAppliedJobs = () => {
+    const userEmail = authUser?.email || (candidateEmail !== 'Not found' ? candidateEmail : '');
+    apiService.getAppliedJobs(userEmail)
       .then((res) => {
         if (res?.applied_keys && Array.isArray(res.applied_keys)) {
           setAppliedJobsCount(res.applied_keys.length);
+          if (res.applications_map && typeof res.applications_map === 'object') {
+            setAppliedJobsMap(res.applications_map);
+          } else {
+            const map = {};
+            res.applied_keys.forEach((k) => { map[k] = { status: 'applied', job_key: k }; });
+            setAppliedJobsMap(map);
+          }
+        } else {
+          setAppliedJobsCount(0);
+          setAppliedJobsMap({});
         }
       })
       .catch(() => {});
   };
+
+  const refreshAppliedCount = refreshAppliedJobs;
 
   const timelineStep = useMemo(() => {
     if (results) return 3;
@@ -539,8 +553,8 @@ function App() {
   useEffect(() => {
     apiService.getPlatformStats().then((data) => setPlatformStats(data)).catch(() => {});
     apiService.getFeatures().then((data) => setFeatures(data?.features || [])).catch(() => {});
-    refreshAppliedCount();
-  }, [authUser]);
+    refreshAppliedJobs();
+  }, [authUser, candidateEmail]);
 
   useEffect(() => {
     setExploreLoading(true);
@@ -576,6 +590,16 @@ function App() {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, user }));
     setAuthPage(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (user?.email) {
+      apiService.getAppliedJobs(user.email)
+        .then((res) => {
+          if (res?.applied_keys && Array.isArray(res.applied_keys)) {
+            setAppliedJobsCount(res.applied_keys.length);
+            if (res.applications_map) setAppliedJobsMap(res.applications_map);
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   const handleLogout = async () => {
@@ -589,6 +613,8 @@ function App() {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     setAuthToken(null);
     setAuthUser(null);
+    setAppliedJobsCount(0);
+    setAppliedJobsMap({});
   };
   const handleAnalyze = async () => {
     if (!file) return;
@@ -834,6 +860,8 @@ function App() {
                   title="Personalized Job Matches — For Your Profile"
                   subtitle="Verified India openings matching your evaluated resume skills & recommended roles"
                   candidateProfile={candidateProfile}
+                  appliedJobsMap={appliedJobsMap}
+                  onApplySuccess={refreshAppliedJobs}
                   onOpenApplications={() => setShowApplicationsModal(true)}
                 />
               </div>
@@ -875,6 +903,8 @@ function App() {
               title={`Live Openings for ${selectedExploreRole}`}
               subtitle="Browse real-time openings in India across top tech companies, startups & enterprises"
               candidateProfile={candidateProfile}
+              appliedJobsMap={appliedJobsMap}
+              onApplySuccess={refreshAppliedJobs}
               onOpenApplications={() => setShowApplicationsModal(true)}
             />
           </div>

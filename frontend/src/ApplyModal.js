@@ -20,6 +20,8 @@ import {
   DollarSign,
   FileText,
   Award,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { apiService, formatAuthError } from './api/client';
 
@@ -33,6 +35,7 @@ export default function ApplyModal({
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [copiedPitch, setCopiedPitch] = useState(false);
 
   // Pre-filled candidate details
   const [name, setName] = useState(candidateProfile.name || '');
@@ -52,6 +55,15 @@ export default function ApplyModal({
   const defaultPitch = `Dear Hiring Team at ${job.company_name || 'the company'},\n\nI am applying for the ${job.job_title || 'open role'}. My background in ${(matchedSkills.slice(0, 5).join(', ')) || 'modern software engineering'} aligns strongly with your requirements (${atsScore}% ATS Match). I am available to join ${noticePeriod.toLowerCase()} and look forward to contributing to your team.`;
   const [coverNote, setCoverNote] = useState(defaultPitch);
 
+  const handleCopyPitch = () => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(coverNote).then(() => {
+        setCopiedPitch(true);
+        setTimeout(() => setCopiedPitch(false), 2500);
+      }).catch(() => {});
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -66,6 +78,16 @@ export default function ApplyModal({
     }
 
     setLoading(true);
+    let targetWindow = null;
+    // Attempt to open official application tab immediately from user click gesture (bypasses popup blockers)
+    if (job.redirect_url && job.redirect_url.startsWith('http')) {
+      try {
+        targetWindow = window.open('about:blank', '_blank');
+      } catch (e) {
+        targetWindow = null;
+      }
+    }
+
     try {
       const payload = {
         job_title: job.job_title,
@@ -90,15 +112,13 @@ export default function ApplyModal({
       setSubmitted(true);
       onApplySuccess?.(job, res);
 
-      // Automatically launch Company Official Career Web in new tab
-      if (job.redirect_url && job.redirect_url.startsWith('http')) {
-        try {
-          window.open(job.redirect_url, '_blank', 'noopener,noreferrer');
-        } catch (e) {
-          console.warn('Popup blocked:', e);
-        }
+      if (targetWindow && job.redirect_url) {
+        targetWindow.location.href = job.redirect_url;
       }
     } catch (err) {
+      if (targetWindow) {
+        try { targetWindow.close(); } catch (_) {}
+      }
       setError(formatAuthError(err) || 'Failed to submit application. Please try again.');
     } finally {
       setLoading(false);
@@ -347,10 +367,10 @@ export default function ApplyModal({
             </div>
             <h4 className="fw-bold text-dark mb-1">Application Submitted &amp; Forwarded!</h4>
             <p className="text-muted small mb-3 px-3">
-              Your resume details and screening pitch have been logged into your PathFinder AI tracker, an email confirmation was dispatched to <strong>{email}</strong>, and <strong>{job.company_name}</strong>'s official career application webpage has been launched in a new tab!
+              Your candidate profile has been recorded in your cloud tracking dashboard, an email confirmation was dispatched to <strong>{email}</strong>, and <strong>{job.company_name}</strong>'s official career application webpage is ready for your submission.
             </p>
 
-            <div className="p-3 bg-light rounded text-start mb-4 mx-auto" style={{ maxWidth: '520px' }}>
+            <div className="p-3 bg-light rounded text-start mb-3 mx-auto border" style={{ maxWidth: '540px' }}>
               <div className="d-flex justify-content-between mb-1">
                 <span className="text-muted small">Position:</span>
                 <span className="fw-semibold small">{job.job_title}</span>
@@ -360,19 +380,50 @@ export default function ApplyModal({
                 <span className="fw-bold text-primary small">🏢 {job.company_name}</span>
               </div>
               <div className="d-flex justify-content-between mb-1">
-                <span className="text-muted small">PathFinder AI Tracker:</span>
-                <span className="badge bg-success text-light">✓ Saved in Database</span>
+                <span className="text-muted small">Cloud Tracker:</span>
+                <span className="badge bg-success text-light">✓ Saved to Cloud Firestore</span>
               </div>
               <div className="d-flex justify-content-between mb-1">
                 <span className="text-muted small">Confirmation Email:</span>
                 <span className="badge bg-info text-light">✓ Dispatched to {email}</span>
               </div>
               <div className="d-flex justify-content-between">
-                <span className="text-muted small">Company Official Web:</span>
-                <span className="badge bg-secondary text-light">✓ Opened in New Tab</span>
+                <span className="text-muted small">Official Application:</span>
+                <span className="badge bg-primary text-light">✓ Real Company Webpage Linked</span>
               </div>
             </div>
 
+            {/* One-Click Copy Tailored Pitch for the Real Company Application Form */}
+            <div className="p-3 bg-white rounded border mb-4 mx-auto text-start" style={{ maxWidth: '540px' }}>
+              <div className="d-flex align-items-center justify-content-between mb-1">
+                <span className="fw-bold small text-dark d-inline-flex align-items-center gap-1">
+                  <Sparkles size={14} className="text-primary" /> Tailored Cover Letter / Pitch
+                </span>
+                <button
+                  type="button"
+                  className={`btn btn-xs ${copiedPitch ? 'btn-success' : 'btn-outline-primary'} d-inline-flex align-items-center gap-1`}
+                  style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem' }}
+                  onClick={handleCopyPitch}
+                >
+                  {copiedPitch ? (
+                    <>
+                      <Check size={12} />
+                      <span>Copied to Clipboard!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} />
+                      <span>Copy Pitch for Company Form</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-muted small mb-0" style={{ fontSize: '0.8rem', whiteSpace: 'pre-line', maxHeight: '90px', overflowY: 'auto' }}>
+                {coverNote}
+              </p>
+            </div>
+
+            {/* Direct Official Apply Buttons */}
             <div className="d-flex flex-wrap justify-content-center gap-2">
               {job.redirect_url && (
                 <a
@@ -380,9 +431,10 @@ export default function ApplyModal({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-sm btn-primary tw-btn-primary d-inline-flex align-items-center gap-2 px-3 shadow"
+                  style={{ fontSize: '0.88rem' }}
                 >
                   <ExternalLink size={14} />
-                  <span>Go to {job.company_name} Official Career Web</span>
+                  <span>🚀 Go to {job.company_name} Official Career Web</span>
                 </a>
               )}
               <button

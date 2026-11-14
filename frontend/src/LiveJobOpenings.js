@@ -321,7 +321,7 @@ function normalizeJob(job) {
   };
 }
 
-function JobCard({ job, index, onApplyClick, isApplied }) {
+function JobCard({ job, index, onApplyClick, isApplied, appliedInfo, onOpenApplications }) {
   const j = normalizeJob(job);
   const branding = getCompanyBranding(j.company_name);
 
@@ -430,14 +430,32 @@ function JobCard({ job, index, onApplyClick, isApplied }) {
 
         <div className="tw-property-card__footer mt-2 d-flex flex-column gap-2">
           {isApplied ? (
-            <button
-              type="button"
-              className="btn btn-sm btn-success w-100 d-inline-flex align-items-center justify-content-center gap-1 shadow-sm"
-              disabled
-            >
-              <CheckCircle size={14} />
-              <span>✓ Applied &amp; Tracked</span>
-            </button>
+            <div className="d-flex flex-column gap-1 w-100">
+              <div className="p-2 rounded bg-success-subtle border border-success d-flex align-items-center justify-content-between shadow-sm">
+                <span className="small fw-bold text-success d-inline-flex align-items-center gap-1" style={{ fontSize: '0.78rem' }}>
+                  <CheckCircle size={14} />
+                  <span>
+                    {appliedInfo?.status === 'interview_scheduled'
+                      ? '🎉 Interview Scheduled'
+                      : appliedInfo?.status === 'in_review'
+                      ? '⏳ In Review'
+                      : appliedInfo?.status === 'shortlisted'
+                      ? '🌟 Shortlisted'
+                      : '✓ Applied (Under Review)'}
+                  </span>
+                </span>
+                {onOpenApplications && (
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline-primary py-0 px-2"
+                    style={{ fontSize: '0.7rem', fontWeight: 600 }}
+                    onClick={onOpenApplications}
+                  >
+                    View Status
+                  </button>
+                )}
+              </div>
+            </div>
           ) : (
             <button
               type="button"
@@ -467,7 +485,7 @@ function JobCard({ job, index, onApplyClick, isApplied }) {
   );
 }
 
-function RoleJobGroup({ roleName, jobs, onApplyClick, appliedJobs = {} }) {
+function RoleJobGroup({ roleName, jobs, onApplyClick, appliedJobs = {}, onOpenApplications = null }) {
   const roleSlug = encodeURIComponent(roleName.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
   const encRole = encodeURIComponent(roleName);
 
@@ -518,6 +536,7 @@ function RoleJobGroup({ roleName, jobs, onApplyClick, appliedJobs = {} }) {
             const jNorm = normalizeJob(job);
             const key = `${jNorm.company_name.toLowerCase()}::${jNorm.job_title.toLowerCase()}`;
             const isApplied = Boolean(appliedJobs[key]);
+            const appliedInfo = appliedJobs[key] || null;
             return (
               <div key={`${roleName}-${job.job_title}-${i}`} className="col-md-6 col-lg-4 col-xl-3">
                 <JobCard
@@ -525,6 +544,8 @@ function RoleJobGroup({ roleName, jobs, onApplyClick, appliedJobs = {} }) {
                   index={i}
                   onApplyClick={onApplyClick}
                   isApplied={isApplied}
+                  appliedInfo={appliedInfo}
+                  onOpenApplications={onOpenApplications}
                 />
               </div>
             );
@@ -577,29 +598,47 @@ export default function LiveJobOpenings({
   title = "Live Job Openings — India",
   subtitle = null,
   candidateProfile = {},
+  appliedJobsMap = {},
+  onApplySuccess = null,
   onOpenApplications = null,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('All');
   const [selectedRoleTab, setSelectedRoleTab] = useState('All');
   const [activeApplyJob, setActiveApplyJob] = useState(null);
-  const [appliedJobs, setAppliedJobs] = useState({});
+  const [localAppliedJobs, setLocalAppliedJobs] = useState({});
 
   useEffect(() => {
-    apiService.getAppliedJobs()
+    const emailParam = candidateProfile?.email || '';
+    apiService.getAppliedJobs(emailParam)
       .then((res) => {
         if (res?.applied_keys && Array.isArray(res.applied_keys)) {
-          const map = {};
-          res.applied_keys.forEach((k) => { map[k] = true; });
-          setAppliedJobs((prev) => ({ ...prev, ...map }));
+          if (res.applications_map) {
+            setLocalAppliedJobs((prev) => ({ ...prev, ...res.applications_map }));
+          } else {
+            const map = {};
+            res.applied_keys.forEach((k) => { map[k] = { status: 'applied', job_key: k }; });
+            setLocalAppliedJobs((prev) => ({ ...prev, ...map }));
+          }
         }
       })
       .catch(() => {});
-  }, []);
+  }, [candidateProfile?.email]);
+
+  const effectiveAppliedJobs = useMemo(() => {
+    return { ...appliedJobsMap, ...localAppliedJobs };
+  }, [appliedJobsMap, localAppliedJobs]);
 
   const handleApplySuccess = (job, res) => {
     const key = `${(job.company_name || '').toLowerCase()}::${(job.job_title || '').toLowerCase()}`;
-    setAppliedJobs((prev) => ({ ...prev, [key]: true }));
+    const newRecord = {
+      status: res?.status || 'applied',
+      job_key: key,
+      created_at: Date.now() / 1000,
+      redirect_url: job.redirect_url || '',
+    };
+    setLocalAppliedJobs((prev) => ({ ...prev, [key]: newRecord }));
+    onApplySuccess?.(job, res);
   };
 
   const roleOrder = useMemo(() => {
@@ -799,7 +838,8 @@ export default function LiveJobOpenings({
           roleName={roleName}
           jobs={filteredJobsByRole[roleName] || []}
           onApplyClick={setActiveApplyJob}
-          appliedJobs={appliedJobs}
+          appliedJobs={effectiveAppliedJobs}
+          onOpenApplications={onOpenApplications}
         />
       ))}
 

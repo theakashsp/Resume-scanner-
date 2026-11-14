@@ -70,6 +70,8 @@ def mock_firebase_collections():
     failed_col = FakeFirestoreCollection()
 
     with patch("firebase_service.is_firebase_configured", return_value=True), \
+         patch("firebase_service.init_firebase", return_value=True), \
+         patch("firebase_service._resolve_credentials", return_value=None), \
          patch("firebase_service.is_firestore_connected", return_value=True), \
          patch("firebase_service.get_users_col", return_value=users_col), \
          patch("firebase_service.get_sessions_col", return_value=sessions_col), \
@@ -178,3 +180,38 @@ def test_firebase_applications_crud(mock_firebase_collections):
     assert updated is not None
     assert updated["status"] == "in_review"
     assert len(updated["recruiter_replies"]) == 1
+
+
+def test_applied_jobs_endpoint_filters_by_user(mock_firebase_collections):
+    import main
+
+    # 1. Unauthenticated with no email returns empty
+    res_empty = main.api_jobs_applied(authorization=None, email=None)
+    assert res_empty["count"] == 0
+    assert res_empty["applied_keys"] == []
+
+    # 2. Save an application for user A
+    app_record = {
+        "id": "app-user-a",
+        "job_key": "acme::frontend engineer",
+        "company_name": "Acme Inc",
+        "job_title": "Frontend Engineer",
+        "candidate_email": "user.a@example.com",
+        "candidate_name": "User A",
+        "status": "applied",
+        "created_at": time.time(),
+        "recruiter_replies": [],
+    }
+    firebase_service.save_application_to_firestore(app_record)
+
+    # 3. Query for user A returns their applications
+    res_a = main.api_jobs_applied(authorization=None, email="user.a@example.com")
+    assert res_a["count"] == 1
+    assert "acme::frontend engineer" in res_a["applied_keys"]
+    assert "acme::frontend engineer" in res_a["applications_map"]
+    assert res_a["applications_map"]["acme::frontend engineer"]["company_name"] == "Acme Inc"
+
+    # 4. Query for user B returns empty
+    res_b = main.api_jobs_applied(authorization=None, email="user.b@example.com")
+    assert res_b["count"] == 0
+

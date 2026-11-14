@@ -149,11 +149,22 @@ export default function ApplicationsModal({
             </div>
             <div>
               <h5 className="mb-0 fw-bold" style={{ fontSize: '1.1rem', letterSpacing: '-0.01em' }}>
-                Applied Jobs Tracker
+                Applied Jobs &amp; Status Tracker
               </h5>
-              <p className="mb-0 small text-white-50" style={{ fontSize: '0.78rem' }}>
-                Track submitted applications, automated emails & recruiter replies
-              </p>
+              <div className="d-flex align-items-center gap-2 mt-1">
+                <span className="badge bg-primary text-light px-2 py-0" style={{ fontSize: '0.72rem' }}>
+                  ☁️ Firebase Cloud
+                </span>
+                {candidateEmail ? (
+                  <span className="text-white-50 small" style={{ fontSize: '0.75rem' }}>
+                    Account: <strong className="text-white">{candidateEmail}</strong>
+                  </span>
+                ) : (
+                  <span className="text-white-50 small" style={{ fontSize: '0.75rem' }}>
+                    Real-time Cloud Sync
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="d-flex align-items-center gap-2">
@@ -500,11 +511,11 @@ export default function ApplicationsModal({
                               href={app.redirect_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1 ms-auto"
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                              className="btn btn-xs btn-primary tw-btn-primary d-inline-flex align-items-center gap-1 ms-auto fw-bold shadow-sm"
+                              style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem' }}
                             >
-                              <span>Employer Career Page</span>
-                              <ExternalLink size={11} />
+                              <span>🚀 Go to Official Employer Job Web</span>
+                              <ExternalLink size={12} />
                             </a>
                           )}
                         </div>

@@ -2053,7 +2053,16 @@ def _store_local_application(rec: dict[str, Any]) -> None:
                     current = data
             except Exception:
                 current = []
-        current.append(rec)
+        cand_email = str(rec.get("candidate_email", "")).strip().lower()
+        job_k = str(rec.get("job_key", ""))
+        updated = False
+        for idx, doc in enumerate(current):
+            if str(doc.get("candidate_email", "")).strip().lower() == cand_email and str(doc.get("job_key")) == job_k:
+                current[idx] = rec
+                updated = True
+                break
+        if not updated:
+            current.insert(0, rec)
         _APPLICATIONS_FILE.write_text(json.dumps(current, indent=2, default=str), encoding="utf-8")
     except Exception as exc:
         logger.error(f"[Applications] Error saving local application: {exc}")
@@ -2185,12 +2194,15 @@ def api_jobs_applications(authorization: str | None = Header(default=None), emai
         if user and user.get("email"):
             user_email = user["email"].strip().lower()
 
+    if not user_email:
+        return {"applications": [], "count": 0, "user_email": ""}
+
     apps_map: dict[str, dict[str, Any]] = {}
 
     # 1. Firebase Cloud Firestore (Primary Cloud Store)
     if firebase_service.is_firebase_configured():
         try:
-            fb_apps = firebase_service.get_applications_from_firestore(user_email or None)
+            fb_apps = firebase_service.get_applications_from_firestore(user_email)
             for rec in fb_apps:
                 doc_id = str(rec.get("id") or rec.get("job_key"))
                 rec["id"] = doc_id
@@ -2270,16 +2282,30 @@ def api_jobs_applied(authorization: str | None = Header(default=None), email: st
         if user and user.get("email"):
             user_email = user["email"].strip().lower()
 
+    if not user_email:
+        return {"applied_keys": [], "applications_map": {}, "count": 0, "user_email": ""}
+
     applied_keys = []
+    applications_map: dict[str, dict[str, Any]] = {}
 
     # 1. Firebase Cloud Firestore
     if firebase_service.is_firebase_configured():
         try:
-            fb_apps = firebase_service.get_applications_from_firestore(user_email or None)
+            fb_apps = firebase_service.get_applications_from_firestore(user_email)
             for doc in fb_apps:
                 k = doc.get("job_key") or f"{doc.get('company_name','').lower()}::{doc.get('job_title','').lower()}"
                 if k not in applied_keys:
                     applied_keys.append(k)
+                applications_map[k] = {
+                    "id": str(doc.get("id") or k),
+                    "job_key": k,
+                    "company_name": doc.get("company_name", ""),
+                    "job_title": doc.get("job_title", ""),
+                    "status": doc.get("status", "applied"),
+                    "created_at": doc.get("created_at") or 0,
+                    "redirect_url": doc.get("redirect_url", ""),
+                    "recruiter_replies_count": len(doc.get("recruiter_replies") or []),
+                }
         except Exception as exc:
             logger.error(f"[Applications] Firebase Firestore query error: {exc}")
 
@@ -2289,8 +2315,24 @@ def api_jobs_applied(authorization: str | None = Header(default=None), email: st
         k = doc.get("job_key") or f"{doc.get('company_name','').lower()}::{doc.get('job_title','').lower()}"
         if k not in applied_keys:
             applied_keys.append(k)
+        if k not in applications_map:
+            applications_map[k] = {
+                "id": str(doc.get("id") or k),
+                "job_key": k,
+                "company_name": doc.get("company_name", ""),
+                "job_title": doc.get("job_title", ""),
+                "status": doc.get("status", "applied"),
+                "created_at": doc.get("created_at") or 0,
+                "redirect_url": doc.get("redirect_url", ""),
+                "recruiter_replies_count": len(doc.get("recruiter_replies") or []),
+            }
 
-    return {"applied_keys": applied_keys, "count": len(applied_keys)}
+    return {
+        "applied_keys": applied_keys,
+        "applications_map": applications_map,
+        "count": len(applied_keys),
+        "user_email": user_email,
+    }
 
 
 @app.get("/health")
