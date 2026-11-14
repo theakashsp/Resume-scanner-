@@ -79,11 +79,12 @@ def _resolve_credentials() -> Any | None:
                 except Exception as exc:
                     logger.error(f"[Firebase] Error loading certificate file '{path}': {exc}")
 
-    # Option 3: Default application credentials (e.g., when hosted on Google Cloud Run)
-    try:
-        return credentials.ApplicationDefault()
-    except Exception:
-        pass
+    # Option 3: Default application credentials only when explicitly in GCP environment
+    if any(os.getenv(k) for k in ("GOOGLE_APPLICATION_CREDENTIALS", "K_SERVICE", "GAE_INSTANCE", "CLOUD_RUN_JOB")):
+        try:
+            return credentials.ApplicationDefault()
+        except Exception:
+            pass
 
     return None
 
