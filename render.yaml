@@ -36,10 +36,12 @@ services:
         sync: false
       - key: CORS_ORIGIN_REGEX
         value: "^https:\\/\\/.*\\.vercel\\.app$|^https:\\/\\/.*\\.netlify\\.app$|^https:\\/\\/.*\\.onrender\\.com$"
-      - key: MONGODB_URI
+      - key: FIREBASE_PROJECT_ID
         sync: false
-      - key: MONGODB_DB_NAME
-        value: resume_analyzer
+      - key: FIREBASE_CREDENTIALS_JSON
+        sync: false
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
 
   # ----------------------------------------------------------------------------
   # Frontend Static Web App (React 19 / Create React App)

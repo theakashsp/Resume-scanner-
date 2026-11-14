@@ -1,7 +1,15 @@
 .env
 .env.*
 !.env.example
-backend/.env
+*.env
+*.env.*
+!*.env.example
+backend/.env*
+frontend/.env*
+*serviceAccountKey*.json
+*firebase-adminsdk*.json
+*credentials*.json
+*.pem
 backend/venv/
 backend/uploads/
 backend/platform_stats.json

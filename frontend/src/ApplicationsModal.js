@@ -520,7 +520,7 @@ export default function ApplicationsModal({
         {/* Modal Footer */}
         <div className="p-3 bg-light border-top d-flex justify-content-between align-items-center">
           <span className="small text-muted">
-            Live persistence via MongoDB Atlas with automatic candidate email dispatch
+            Live persistence via Firebase Firestore with automatic candidate email dispatch
           </span>
           <button type="button" className="btn btn-sm btn-primary tw-btn-primary px-4" onClick={onClose}>
             Close

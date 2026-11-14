@@ -17,7 +17,7 @@ from typing import Any
 
 from database import get_db_session, is_database_configured
 from logger import logger
-import mongo
+import firebase_service
 from models import User, UserSession
 
 _BACKEND_DIR = Path(__file__).resolve().parent
@@ -90,15 +90,15 @@ def _save_users(data: dict[str, Any]) -> None:
 
 
 # ==============================================================================
-# Helper to determine if MongoDB is active and ready
+# Helper to determine if Firebase Firestore is active and ready
 # ==============================================================================
-def is_mongo_active() -> bool:
-    """Returns True if MongoDB is configured and users collection is accessible."""
-    return mongo.is_mongo_configured() and mongo.get_users_col() is not None
+def is_firebase_active() -> bool:
+    """Returns True if Firebase is configured and users collection is accessible."""
+    return firebase_service.is_firebase_configured() and firebase_service.get_users_col() is not None
 
 
 # ==============================================================================
-# Core Authentication API Methods (Pluggable: MongoDB -> SQL -> JSON Fallback)
+# Core Authentication API Methods (Pluggable: Firebase Firestore -> SQL -> JSON Fallback)
 # ==============================================================================
 def register_user(name: str, email: str, password: str, phone: str = "") -> dict[str, Any]:
     clean_name = " ".join((name or "").split())
@@ -117,12 +117,12 @@ def register_user(name: str, email: str, password: str, phone: str = "") -> dict
     salt, pwd_hash = _hash_password(password)
     created_at = int(time.time())
 
-    # Option 1: MongoDB (Primary)
-    if is_mongo_active():
+    # Option 1: Firebase Firestore (Primary Cloud Store)
+    if is_firebase_active():
         try:
-            users_col = mongo.get_users_col()
-            existing = users_col.find_one({"email": email_n})
-            if existing:
+            users_col = firebase_service.get_users_col()
+            doc_ref = users_col.document(email_n)
+            if doc_ref.get().exists:
                 raise ValueError("An account with this email already exists. Please sign in.")
 
             doc = {
@@ -134,13 +134,13 @@ def register_user(name: str, email: str, password: str, phone: str = "") -> dict
                 "created_at": created_at,
                 "updated_at": created_at,
             }
-            users_col.insert_one(doc)
-            logger.info(f"[Auth] Registered new user via MongoDB: {email_n}")
+            doc_ref.set(doc)
+            logger.info(f"[Auth] Registered new user via Firebase Firestore: {email_n}")
             return {"name": clean_name, "email": email_n, "phone": phone_clean}
         except ValueError:
             raise
         except Exception as exc:
-            logger.error(f"[Auth] MongoDB register error: {exc}. Falling back to secondary stores.")
+            logger.error(f"[Auth] Firebase register error: {exc}. Falling back to secondary stores.")
 
     # Option 2: Relational database (PostgreSQL / SQLite)
     if is_database_configured():
@@ -205,24 +205,29 @@ def login_user(email: str, password: str) -> dict[str, Any]:
     token = secrets.token_urlsafe(32)
     expires_at = now + _SESSION_TTL_SEC
 
-    # Option 1: MongoDB (Primary)
-    if is_mongo_active():
+    # Option 1: Firebase Firestore (Primary Cloud Store)
+    if is_firebase_active():
         try:
-            users_col = mongo.get_users_col()
-            sessions_col = mongo.get_sessions_col()
-            user = users_col.find_one({"email": email_n})
-            if not user or not _verify_password(password, user.get("salt", ""), user.get("password_hash", "")):
+            users_col = firebase_service.get_users_col()
+            sessions_col = firebase_service.get_sessions_col()
+            user_doc = users_col.document(email_n).get()
+            if not user_doc.exists:
+                _record_failure()
+                raise ValueError("Invalid email or password. Please try again.")
+
+            user = user_doc.to_dict()
+            if not _verify_password(password, user.get("salt", ""), user.get("password_hash", "")):
                 _record_failure()
                 raise ValueError("Invalid email or password. Please try again.")
 
             _failed_logins.pop(email_n, None)
-            sessions_col.insert_one({
+            sessions_col.document(token).set({
                 "token": token,
                 "email": email_n,
                 "expires_at": expires_at,
                 "created_at": now,
             })
-            logger.info(f"[Auth] Successful login via MongoDB: {email_n}")
+            logger.info(f"[Auth] Successful login via Firebase Firestore: {email_n}")
             return {
                 "token": token,
                 "user": {
@@ -234,7 +239,7 @@ def login_user(email: str, password: str) -> dict[str, Any]:
         except ValueError:
             raise
         except Exception as exc:
-            logger.error(f"[Auth] MongoDB login error: {exc}. Trying fallback stores.")
+            logger.error(f"[Auth] Firebase login error: {exc}. Trying fallback stores.")
 
     # Option 2: Relational database (PostgreSQL / SQLite)
     if is_database_configured():
@@ -289,30 +294,32 @@ def get_user_by_token(token: str | None) -> dict[str, Any] | None:
 
     now = time.time()
 
-    # Option 1: MongoDB (Primary)
-    if is_mongo_active():
+    # Option 1: Firebase Firestore (Primary Cloud Store)
+    if is_firebase_active():
         try:
-            sessions_col = mongo.get_sessions_col()
-            users_col = mongo.get_users_col()
-            session_doc = sessions_col.find_one({"token": token})
-            if not session_doc:
+            sessions_col = firebase_service.get_sessions_col()
+            users_col = firebase_service.get_users_col()
+            session_doc = sessions_col.document(token).get()
+            if not session_doc.exists:
                 return None
 
-            if float(session_doc.get("expires_at", 0)) < now:
-                sessions_col.delete_one({"token": token})
+            session_data = session_doc.to_dict() or {}
+            if float(session_data.get("expires_at", 0)) < now:
+                sessions_col.document(token).delete()
                 return None
 
-            user_doc = users_col.find_one({"email": session_doc["email"]})
-            if not user_doc:
+            user_doc = users_col.document(session_data.get("email", "")).get()
+            if not user_doc.exists:
                 return None
 
+            user_data = user_doc.to_dict() or {}
             return {
-                "name": user_doc["name"],
-                "email": user_doc["email"],
-                "phone": user_doc.get("phone", ""),
+                "name": user_data.get("name", ""),
+                "email": user_data.get("email", session_data.get("email", "")),
+                "phone": user_data.get("phone", ""),
             }
         except Exception as exc:
-            logger.error(f"[Auth] MongoDB get_user_by_token error: {exc}")
+            logger.error(f"[Auth] Firebase get_user_by_token error: {exc}")
 
     # Option 2: Relational database (PostgreSQL / SQLite)
     if is_database_configured():
@@ -354,15 +361,15 @@ def logout(token: str | None) -> None:
     if not token:
         return
 
-    # Delete from MongoDB if active
-    if is_mongo_active():
+    # Delete from Firebase Firestore if active
+    if is_firebase_active():
         try:
-            sessions_col = mongo.get_sessions_col()
+            sessions_col = firebase_service.get_sessions_col()
             if sessions_col is not None:
-                sessions_col.delete_one({"token": token})
-                logger.info("[Auth] User logged out, session terminated from MongoDB.")
+                sessions_col.document(token).delete()
+                logger.info("[Auth] User logged out, session terminated from Firebase Firestore.")
         except Exception as exc:
-            logger.error(f"[Auth] MongoDB logout error: {exc}")
+            logger.error(f"[Auth] Firebase logout error: {exc}")
 
     # Delete from PostgreSQL if configured
     if is_database_configured():

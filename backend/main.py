@@ -156,8 +156,7 @@ def _is_transient_gemini_error(exc: BaseException) -> bool:
 
 import database
 import email_service
-import mongo
-import s3_storage
+import firebase_service
 
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
 _frontend_url = os.getenv("FRONTEND_URL", "").strip()
@@ -250,8 +249,8 @@ async def request_logging_middleware(request, call_next):
 
 @app.on_event("startup")
 def on_app_startup():
-    if mongo.is_mongo_configured():
-        mongo.init_mongo_indexes()
+    if firebase_service.is_firebase_configured():
+        firebase_service.init_firebase()
     if database.is_database_configured():
         database.init_db()
 
@@ -2039,7 +2038,7 @@ def auth_logout(authorization: str | None = Header(default=None)):
 
 
 # ==============================================================================
-# TECH STACK: [FastAPI & MongoDB] - 1-Click Smart Apply & Application Store
+# TECH STACK: [FastAPI & Firebase Firestore] - 1-Click Smart Apply & Application Store
 # ==============================================================================
 _APPLICATIONS_FILE = _DATA_DIR / "applications_data.json"
 
@@ -2152,16 +2151,12 @@ def api_jobs_apply(body: JobApplyRequest, authorization: str | None = Header(def
         "job_key": f"{body.company_name.lower()}::{body.job_title.lower()}",
     }
 
-    # 1. MongoDB Persistence (Primary Cloud Store)
-    if mongo.is_mongo_configured():
+    # 1. Firebase Cloud Firestore Persistence (Primary Cloud Store)
+    if firebase_service.is_firebase_configured():
         try:
-            col = mongo.get_applications_col()
-            if col is not None:
-                doc_to_save = dict(app_record)
-                col.insert_one(doc_to_save)
-                logger.info(f"[Applications] Stored application in MongoDB: {app_record['job_key']} for {email}")
+            firebase_service.save_application_to_firestore(app_record)
         except Exception as exc:
-            logger.error(f"[Applications] MongoDB insert error: {exc}")
+            logger.error(f"[Applications] Firebase Firestore insert error: {exc}")
 
     # 2. Local File Persistence (Fallback Store)
     _store_local_application(app_record)
@@ -2192,24 +2187,16 @@ def api_jobs_applications(authorization: str | None = Header(default=None), emai
 
     apps_map: dict[str, dict[str, Any]] = {}
 
-    # 1. MongoDB
-    if mongo.is_mongo_configured():
+    # 1. Firebase Cloud Firestore (Primary Cloud Store)
+    if firebase_service.is_firebase_configured():
         try:
-            col = mongo.get_applications_col()
-            if col is not None:
-                query = {}
-                if user_email:
-                    query = {"candidate_email": {"$regex": f"^{re.escape(user_email)}$", "$options": "i"}}
-                for doc in col.find(query).sort("created_at", -1):
-                    rec = dict(doc)
-                    if "_id" in rec:
-                        rec["mongo_id"] = str(rec["_id"])
-                        del rec["_id"]
-                    doc_id = str(rec.get("id") or rec.get("mongo_id") or rec.get("job_key"))
-                    rec["id"] = doc_id
-                    apps_map[doc_id] = rec
+            fb_apps = firebase_service.get_applications_from_firestore(user_email or None)
+            for rec in fb_apps:
+                doc_id = str(rec.get("id") or rec.get("job_key"))
+                rec["id"] = doc_id
+                apps_map[doc_id] = rec
         except Exception as exc:
-            logger.error(f"[Applications] MongoDB query error: {exc}")
+            logger.error(f"[Applications] Firebase Firestore query error: {exc}")
 
     # 2. Local Fallback
     local_apps = _load_local_applications(user_email)
@@ -2248,36 +2235,15 @@ def api_jobs_application_reply(app_id: str, body: RecruiterReplyRequest):
     found = False
     updated_doc = None
 
-    # 1. Update in MongoDB
-    if mongo.is_mongo_configured():
+    # 1. Update in Firebase Cloud Firestore
+    if firebase_service.is_firebase_configured():
         try:
-            col = mongo.get_applications_col()
-            if col is not None:
-                query_clauses = [{"id": app_id}, {"job_key": app_id}]
-                try:
-                    from bson import ObjectId
-                    if ObjectId.is_valid(app_id):
-                        query_clauses.append({"_id": ObjectId(app_id)})
-                except Exception:
-                    pass
-
-                res = col.find_one_and_update(
-                    {"$or": query_clauses},
-                    {
-                        "$set": {"status": body.new_status, "updated_at": time.time()},
-                        "$push": {"recruiter_replies": reply_entry},
-                    },
-                    return_document=True,
-                )
-                if res:
-                    found = True
-                    rec = dict(res)
-                    if "_id" in rec:
-                        rec["mongo_id"] = str(rec["_id"])
-                        del rec["_id"]
-                    updated_doc = rec
+            fb_updated = firebase_service.update_application_reply_in_firestore(app_id, reply_entry, body.new_status)
+            if fb_updated:
+                found = True
+                updated_doc = fb_updated
         except Exception as exc:
-            logger.error(f"[Applications] MongoDB reply update error: {exc}")
+            logger.error(f"[Applications] Firebase Firestore reply update error: {exc}")
 
     # 2. Update in Local Storage
     local_updated = _update_local_application_reply(app_id, reply_entry, body.new_status)
@@ -2306,18 +2272,16 @@ def api_jobs_applied(authorization: str | None = Header(default=None), email: st
 
     applied_keys = []
 
-    # 1. MongoDB
-    if mongo.is_mongo_configured():
+    # 1. Firebase Cloud Firestore
+    if firebase_service.is_firebase_configured():
         try:
-            col = mongo.get_applications_col()
-            if col is not None:
-                query = {"candidate_email": user_email} if user_email else {}
-                for doc in col.find(query):
-                    k = doc.get("job_key") or f"{doc.get('company_name','').lower()}::{doc.get('job_title','').lower()}"
-                    if k not in applied_keys:
-                        applied_keys.append(k)
+            fb_apps = firebase_service.get_applications_from_firestore(user_email or None)
+            for doc in fb_apps:
+                k = doc.get("job_key") or f"{doc.get('company_name','').lower()}::{doc.get('job_title','').lower()}"
+                if k not in applied_keys:
+                    applied_keys.append(k)
         except Exception as exc:
-            logger.error(f"[Applications] MongoDB query error: {exc}")
+            logger.error(f"[Applications] Firebase Firestore query error: {exc}")
 
     # 2. Local Fallback
     local_apps = _load_local_applications(user_email)
@@ -2341,13 +2305,12 @@ def health():
             "configured": database.is_database_configured(),
             "type": "relational_db" if database.is_database_configured() else "json_fallback",
         },
-        "mongodb_status": {
-            "configured": mongo.is_mongo_configured(),
-            "connected": mongo.is_mongo_connected() if mongo.is_mongo_configured() else False,
-            "database": mongo._resolve_db_name(mongo._resolve_mongo_uri()) if mongo.is_mongo_configured() else None,
-        },
-        "s3_storage_status": {
-            "enabled": s3_storage.is_s3_enabled(),
+        "firebase_status": {
+            "configured": firebase_service.is_firebase_configured(),
+            "project_id": firebase_service.get_project_id(),
+            "firestore_connected": firebase_service.is_firestore_connected() if firebase_service.is_firebase_configured() else False,
+            "storage_enabled": firebase_service.is_storage_enabled(),
+            "storage_bucket": firebase_service.get_storage_bucket_name(),
         },
         "parser_status": {
             "pdfminer_ready": True,
@@ -2548,22 +2511,20 @@ async def _analyze_impl(file: UploadFile, job_description: str | None = None) ->
             **jobs_payload,
         }
 
-        # Persist analysis summary to MongoDB if configured
-        if mongo.is_mongo_configured():
+        # Persist analysis summary to Firebase Cloud Firestore if configured
+        if firebase_service.is_firebase_configured():
             try:
-                analyses_col = mongo.get_analyses_col()
-                if analyses_col is not None:
-                    analyses_col.insert_one({
-                        "candidate_name": details.get("candidate_name", ""),
-                        "candidate_email": details.get("candidate_email", ""),
-                        "candidate_phone": details.get("candidate_phone", ""),
-                        "detected_domain": domain,
-                        "ats_score": ats,
-                        "recommended_roles": recommended_roles[:5],
-                        "created_at": time.time(),
-                    })
-            except Exception as mongo_err:
-                logger.warning(f"[analyze] Could not record analysis to MongoDB: {mongo_err}")
+                firebase_service.save_analysis_to_firestore({
+                    "candidate_name": details.get("candidate_name", ""),
+                    "candidate_email": details.get("candidate_email", ""),
+                    "candidate_phone": details.get("candidate_phone", ""),
+                    "detected_domain": domain,
+                    "ats_score": ats,
+                    "recommended_roles": recommended_roles[:5],
+                    "created_at": time.time(),
+                })
+            except Exception as fb_err:
+                logger.warning(f"[analyze] Could not record analysis to Firebase: {fb_err}")
 
         return result_payload
     except HTTPException:

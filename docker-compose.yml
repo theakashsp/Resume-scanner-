@@ -22,8 +22,10 @@ services:
       - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,${FRONTEND_URL:-}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - DATABASE_URL=${DATABASE_URL:-}
-      - MONGODB_URI=${MONGODB_URI:-}
-      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-resume_analyzer}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}
+      - FIREBASE_CREDENTIALS_JSON=${FIREBASE_CREDENTIALS_JSON:-}
+      - FIREBASE_CREDENTIALS_PATH=${FIREBASE_CREDENTIALS_PATH:-}
+      - FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET:-}
       - DATA_DIR=/app/data
     volumes:
       - backend_data:/app/data

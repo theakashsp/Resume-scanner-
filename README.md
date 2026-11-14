@@ -60,6 +60,16 @@ Everything this project is built with — languages, libraries, APIs, and toolin
 | **Requests** | JSearch / Adzuna HTTP calls |
 | **pdfminer.six** | Primary PDF text extraction |
 | **pypdf** | Fallback PDF text extraction |
+| **firebase-admin** | Google Firebase SDK for Cloud Firestore & Cloud Storage |
+| **scikit-learn + joblib** | Machine Learning role classification model |
+
+### Cloud Database & Storage (Firebase)
+
+| Item | Role |
+| --- | --- |
+| **Google Cloud Firestore** | NoSQL document database for user profiles, bearer sessions, job applications, and resume scans |
+| **Firebase Cloud Storage** | Persistent document bucket for candidate PDF resumes and career reports with V4 signed URLs |
+| **Local File/Memory Fallback** | Automatic zero-dependency fallback store when cloud credentials are omitted |
 
 ### AI & external APIs
 
@@ -68,6 +78,7 @@ Everything this project is built with — languages, libraries, APIs, and toolin
 | **Google Gemini 2.5 Flash** (`google-genai`) | Resume analysis, ATS score, skills, gaps, roadmap |
 | **JSearch** via **RapidAPI** | Live India job listings (primary) |
 | **Adzuna India API** | Optional alternate job provider |
+| **Google Firebase Admin** | Authentication, application persistence, and file storage |
 
 ### Dev & delivery tools
 
@@ -87,6 +98,10 @@ Everything this project is built with — languages, libraries, APIs, and toolin
 | `RAPIDAPI_KEY` | JSearch jobs |
 | `RAPIDAPI_HOST` | RapidAPI host (`jsearch.p.rapidapi.com`) |
 | `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | Optional Adzuna jobs |
+| `FIREBASE_PROJECT_ID` | Firebase Project ID |
+| `FIREBASE_CREDENTIALS_PATH` | File path to `serviceAccountKey.json` |
+| `FIREBASE_CREDENTIALS_JSON` | Inline JSON string of Firebase service account key |
+| `FIREBASE_STORAGE_BUCKET` | Firebase Cloud Storage bucket name (`<project-id>.appspot.com`) |
 | `REACT_APP_API_URL` | Frontend → backend URL (production) |
 
 > **Never commit `backend/.env`.** Copy `.env.example`, add keys locally, keep secrets out of Git.
@@ -99,24 +114,21 @@ Everything this project is built with — languages, libraries, APIs, and toolin
 [ User ]
    │
    ▼  Upload PDF resume
-
-┌─────────────────────────────┐
-│   React Frontend            │
-│   Resume Analyzer UI        │
-│   Dashboard + PDF Export    │
-└──────────────▲──────────────┘
-               │
-               ▼
-┌─────────────────────────────┐
-│   FastAPI Backend           │
-│   PDF parse · AI analyze    │
-│   Job fetch · Stats API     │
-└──────────────┬──────────────┘
-               │
-      ┌────────┴────────┐
-      ▼                 ▼
- Google Gemini      JSearch / Adzuna
- (resume analysis)  (live India jobs)
+┌────────────────────────────────────────────────────────┐
+│                   React Frontend                       │
+│  Resume Analyzer UI · Dashboard · PDF Export · Auth    │
+└───────────────────────────▲────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                   FastAPI Backend                      │
+│  PDF Parser · ML Matcher · Skills NLP · Auth Engine    │
+└──────────────┬──────────────────────────┬──────────────┘
+               │                          │
+       ┌───────┴────────┐         ┌───────┴────────┐
+       ▼                ▼         ▼                ▼
+  Google Gemini     JSearch/Adzuna  Cloud Firestore  Firebase Storage
+ (AI analysis)     (Live India jobs) (Users & Apps)  (Resumes & Reports)
 ```
 
 ---
@@ -126,7 +138,8 @@ Everything this project is built with — languages, libraries, APIs, and toolin
 | Layer | Technologies |
 | --- | --- |
 | **Frontend** | React 19, Axios, jsPDF, lucide-react, react-dropzone, Bootstrap 5, Google Fonts |
-| **Backend** | Python, FastAPI, Uvicorn, Pydantic, Requests, python-dotenv |
+| **Backend** | Python, FastAPI, Uvicorn, Pydantic, Requests, python-dotenv, scikit-learn |
+| **Database & Storage** | Google Firebase (Cloud Firestore & Firebase Cloud Storage) + Local Fallback |
 | **PDF Parsing** | pdfminer.six, pypdf |
 | **AI** | Google Gemini 2.5 Flash (`google-genai`) with retries + local fallback |
 | **Jobs** | JSearch via RapidAPI, Adzuna India API |
@@ -297,6 +310,9 @@ The **Download Career Report** button generates a styled PDF including:
 Resume-scanner--main/
 ├── backend/
 │   ├── main.py              # FastAPI app, Gemini analysis, job APIs
+│   ├── firebase_service.py  # Google Firebase (Firestore & Cloud Storage adapter)
+│   ├── auth_store.py        # Authentication & session store (Firebase + fallback)
+│   ├── matcher.py           # ML role classifier & TF-IDF model
 │   ├── skills.py            # Domain profiles, skill extraction
 │   ├── pdf_parser.py        # Multi-method PDF text extraction
 │   ├── report_generator.py  # Server-side PDF helper

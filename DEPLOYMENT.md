@@ -12,7 +12,7 @@ This guide details how to deploy the **Resume Analyzer** (FastAPI backend + Reac
 5. [Option 4: Google Cloud Run or AWS App Runner](#5-option-4-google-cloud-run-or-aws-app-runner)
 6. [Option 5: VPS with Docker Compose (AWS EC2 / DigitalOcean)](#6-option-5-vps-with-docker-compose-aws-ec2--digitalocean)
 7. [Cloud Database Setup (PostgreSQL)](#7-cloud-database-setup-postgresql)
-8. [AWS S3 Document Storage (Optional)](#8-aws-s3-document-storage-optional)
+8. [Google Firebase Setup (Cloud Firestore & Cloud Storage)](#8-google-firebase-setup-cloud-firestore--cloud-storage)
 9. [Troubleshooting & FAQs](#9-troubleshooting--faqs)
 
 ---
@@ -27,6 +27,10 @@ Before deploying, ensure you have the required API keys (all keys are optional; 
 | `RAPIDAPI_KEY` | [RapidAPI JSearch](https://rapidapi.com/letscrape-6bRwvSbBY3u/api/jsearch) for live India job listings | Recommended (falls back to portal search links) |
 | `RAPIDAPI_HOST` | `jsearch.p.rapidapi.com` | If using RapidAPI |
 | `DATABASE_URL` | PostgreSQL connection string (Supabase, Neon, Render Postgres) | Optional (defaults to persistent JSON store) |
+| `FIREBASE_PROJECT_ID` | Google Firebase Project ID (e.g. `resume-analyzer-prod`) | Optional (enables Cloud Firestore & Storage) |
+| `FIREBASE_CREDENTIALS_JSON` | Firebase service account key JSON string (Render/Railway secret) | Optional (inline credentials) |
+| `FIREBASE_CREDENTIALS_PATH` | Path to downloaded `serviceAccountKey.json` | Optional (file-based credentials) |
+| `FIREBASE_STORAGE_BUCKET` | Firebase Cloud Storage bucket name (`<project-id>.appspot.com`) | Optional (document persistence) |
 | `REACT_APP_API_URL` | URL of your deployed backend API (e.g. `https://resume-api.onrender.com`) | Only if frontend is hosted separately |
 
 ---
@@ -180,20 +184,60 @@ To connect a cloud PostgreSQL database (e.g. **Supabase**, **Neon**, **Render Po
 
 ---
 
-## 8. AWS S3 Document Storage (Optional)
+## 8. Google Firebase Setup (Cloud Firestore & Cloud Storage)
 
-To store uploaded PDF resumes or generated reports in an Amazon S3 bucket with private ACL and presigned download URLs:
+Resume Analyzer is natively integrated with Google Firebase using the official `firebase-admin` SDK. Firebase serves two major functions:
+1. **Cloud Firestore (Primary Cloud Document Database):**
+   - Candidate user accounts & salted/hashed passwords (`users` collection)
+   - Active bearer login sessions with automated expiration (`user_sessions` collection)
+   - 1-Click Smart Apply job submissions, recruiter reply threads, and status updates (`applications` collection)
+   - Resume scans, ATS scores, and skill gap metrics (`analysis_records` collection)
+   - Brute-force login lockout tracking (`failed_logins` collection)
 
-1. Create an S3 bucket in your AWS account (e.g. `my-resume-analyzer-storage`).
-2. Add the following environment variables to your backend:
-   ```env
-   AWS_S3_BUCKET_NAME=my-resume-analyzer-storage
-   AWS_REGION=ap-south-1
-   AWS_ACCESS_KEY_ID=AKIA...
-   AWS_SECRET_ACCESS_KEY=wJalr...
-   S3_PRESIGNED_URL_EXPIRES_SEC=900
-   ```
-3. The backend will automatically detect AWS S3 credentials and route file persistence through `s3_storage.py`.
+2. **Firebase Cloud Storage (Document & Artifact Bucket):**
+   - Secure storage for uploaded candidate PDF resumes and generated career reports
+   - V4 signed download URLs with short-lived expiration (default 15 minutes) for zero public bucket exposure
+
+### Step-by-Step Firebase Configuration:
+
+1. **Create a Firebase Project:**
+   - Go to the [Firebase Console](https://console.firebase.google.com/).
+   - Click **Add Project** and give it a name (e.g. `resume-analyzer-prod`).
+   - Enable **Cloud Firestore** in production mode.
+   - (Optional) Enable **Cloud Storage** under the Build menu.
+
+2. **Generate a Service Account Private Key:**
+   - In Firebase Console, navigate to **Project Settings** (gear icon) > **Service accounts**.
+   - Click **Generate new private key** and download the `.json` file.
+
+3. **Configure Environment Variables:**
+   - **For Local Development:** Save the downloaded file as `serviceAccountKey.json` inside your `backend/` directory, and add to `backend/.env`:
+     ```env
+     FIREBASE_PROJECT_ID=your-firebase-project-id
+     FIREBASE_CREDENTIALS_PATH=serviceAccountKey.json
+     FIREBASE_STORAGE_BUCKET=your-firebase-project-id.appspot.com
+     ```
+   - **For Cloud Hosting (Render, Railway, Cloud Run):** Rather than uploading the key file, copy the entire raw JSON contents of the key file into an environment variable:
+     ```env
+     FIREBASE_PROJECT_ID=your-firebase-project-id
+     FIREBASE_CREDENTIALS_JSON={"type":"service_account","project_id":"...","private_key":"...","client_email":"..."}
+     FIREBASE_STORAGE_BUCKET=your-firebase-project-id.appspot.com
+     ```
+
+4. **Verify Connectivity:**
+   - When the backend starts up, visit the `/health` endpoint:
+     ```json
+     {
+       "firebase_status": {
+         "configured": true,
+         "project_id": "your-firebase-project-id",
+         "firestore_connected": true,
+         "storage_enabled": true,
+         "storage_bucket": "your-firebase-project-id.appspot.com"
+       }
+     }
+     ```
+   - If Firebase keys are not provided, the platform automatically and silently runs on local JSON storage mode with zero crashes.
 
 ---
 

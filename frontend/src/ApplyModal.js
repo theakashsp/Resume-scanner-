@@ -1,7 +1,7 @@
 // ==============================================================================
 // TECH STACK: [React 19 & Lucide Icons] - 1-Click Smart Apply & Auto-Fill Modal
 // Pre-fills candidate resume details and prompts for job screening questions
-// before dispatching application to employer & MongoDB tracking store.
+// before dispatching application to employer & Firebase Firestore tracking store.
 // ==============================================================================
 import React, { useState } from 'react';
 import {
