@@ -15,7 +15,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useDropzone } from 'react-dropzone';
 
 // --- [TECH STACK: Axios] Centralized Production API Client ---
-import { apiService, formatApiError, getApiOrigin } from './api/client';
+import { apiService, formatApiError } from './api/client';
 
 // --- [TECH STACK: Lucide React] Clean, customizable SVG icons ---
 import {
@@ -490,8 +490,12 @@ function App() {
   const [appliedJobsCount, setAppliedJobsCount] = useState(0);
   const [appliedJobsMap, setAppliedJobsMap] = useState({});
 
-  const refreshAppliedJobs = () => {
-    const userEmail = authUser?.email || (candidateEmail !== 'Not found' ? candidateEmail : '');
+  const refreshAppliedJobs = useCallback(() => {
+    const userEmail =
+      authUser?.email ||
+      results?.candidate_email ||
+      results?.candidate_metadata?.candidate_email ||
+      '';
     apiService.getAppliedJobs(userEmail)
       .then((res) => {
         if (res?.applied_keys && Array.isArray(res.applied_keys)) {
@@ -509,7 +513,7 @@ function App() {
         }
       })
       .catch(() => {});
-  };
+  }, [authUser?.email, results?.candidate_email, results?.candidate_metadata?.candidate_email]);
 
   const refreshAppliedCount = refreshAppliedJobs;
 
@@ -554,7 +558,7 @@ function App() {
     apiService.getPlatformStats().then((data) => setPlatformStats(data)).catch(() => {});
     apiService.getFeatures().then((data) => setFeatures(data?.features || [])).catch(() => {});
     refreshAppliedJobs();
-  }, [authUser, candidateEmail]);
+  }, [refreshAppliedJobs]);
 
   useEffect(() => {
     setExploreLoading(true);
@@ -642,7 +646,7 @@ function App() {
     }
   };
 
-  const matched = results?.matched_skills ?? [];
+  const matched = useMemo(() => results?.matched_skills ?? [], [results?.matched_skills]);
   const missing = results?.missing_skills ?? [];
   const role = results?.predicted_role;
   const roadmap = results?.learning_roadmap ?? [];

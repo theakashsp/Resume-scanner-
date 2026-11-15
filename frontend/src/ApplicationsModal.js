@@ -3,7 +3,7 @@
 // Displays all submitted applications, confirmation email dispatch status,
 // and incoming recruiter replies with live simulated response testing.
 // ==============================================================================
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   X,
   Briefcase,
@@ -40,7 +40,7 @@ export default function ApplicationsModal({
   const [replyStatus, setReplyStatus] = useState('Interview Scheduled');
   const [submittingReply, setSubmittingReply] = useState(false);
 
-  const fetchApplications = async () => {
+  const fetchApplications = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -55,13 +55,13 @@ export default function ApplicationsModal({
     } finally {
       setLoading(false);
     }
-  };
+  }, [candidateEmail]);
 
   useEffect(() => {
     if (isOpen) {
       fetchApplications();
     }
-  }, [isOpen, candidateEmail]);
+  }, [isOpen, fetchApplications]);
 
   const handleSimulateReply = async (appId) => {
     if (!replyMessage.trim()) return;
