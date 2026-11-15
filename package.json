@@ -4,7 +4,7 @@
   "private": true,
   "description": "Resume Scanner and ATS Intelligence Platform",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
+    "build": "cd frontend && npm install --include=dev && npm run build && node -e \"const fs=require('fs'); fs.cpSync('build', '../build', {recursive:true});\"",
     "start": "cd frontend && npm start",
     "start:backend": "cd backend && uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
     "test": "cd frontend && npm test -- --watchAll=false",
@@ -12,5 +12,8 @@
     "docker:build": "docker build -t resume-analyzer .",
     "docker:run": "docker run -p 8000:8000 resume-analyzer",
     "docker:compose": "docker compose up --build"
+  },
+  "dependencies": {
+    "cross-env": "^7.0.3"
   }
 }
