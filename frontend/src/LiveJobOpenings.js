@@ -751,7 +751,7 @@ export default function LiveJobOpenings({
               <Briefcase size={13} />
               <span>Applied Jobs Tracker</span>
               <span className="badge bg-white text-success ms-1 rounded-pill" style={{ fontSize: '0.72rem' }}>
-                {Object.keys(appliedJobs).length}
+                {Object.keys(effectiveAppliedJobs).length}
               </span>
             </button>
           )}
