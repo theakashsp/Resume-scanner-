@@ -490,6 +490,7 @@ def _job_record(
         "employer_name": company_name,
         "job_apply_link": url,
         "job_employment_type": employment_type,
+        "employment_type": employment_type,
         "salary_range": final_salary,
         "portal": portal,
         "search_links": search_links,
@@ -1964,18 +1965,33 @@ def root(request: Request):
 
 @app.get("/api/explore-jobs")
 def api_explore_jobs(role: str = "Software Engineer", domain: str = "IT & Software"):
-    roles = [role]
-    profile = DOMAIN_PROFILES.get(domain)
+    role_clean = role.strip()
+    role_lower = role_clean.lower()
+
+    matched_domain = domain
+    if any(k in role_lower for k in ("vlsi", "rtl", "asic", "semiconductor", "fpga", "chip")):
+        matched_domain = "VLSI & Semiconductor Engineering"
+    elif any(k in role_lower for k in ("embedded", "firmware", "iot", "microcontroller")):
+        matched_domain = "Embedded & Systems Engineering"
+    elif any(k in role_lower for k in ("cloud", "devops", "aws", "azure", "docker", "kubernetes")):
+        matched_domain = "Cloud & DevOps"
+    elif any(k in role_lower for k in ("ai", "ml", "machine learning", "deep learning", "nlp")):
+        matched_domain = "Data Science & AI"
+    elif any(k in role_lower for k in ("data", "analyst", "business intelligence", "bi")):
+        matched_domain = "Data Science & AI"
+
+    roles = [role_clean]
+    profile = DOMAIN_PROFILES.get(matched_domain)
     if profile:
         for r in profile.get("roles", []):
-            if r != role and len(roles) < 4:
+            if r != role_clean and len(roles) < 4:
                 roles.append(r)
     else:
         for r in ["Full Stack Developer", "Data Analyst", "Cloud & DevOps Engineer"]:
-            if r != role and len(roles) < 4:
+            if r != role_clean and len(roles) < 4:
                 roles.append(r)
     payload = _build_jobs_payload(roles)
-    return {"roles": roles, "domain": domain, **payload}
+    return {"roles": roles, "domain": matched_domain, **payload}
 
 
 @app.get("/api/platform-stats")

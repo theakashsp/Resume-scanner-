@@ -876,6 +876,8 @@ function App() {
             <div className="d-flex flex-wrap justify-content-center gap-2 mb-4">
               {[
                 'Full Stack Developer',
+                'VLSI / RTL Design Engineer',
+                'Embedded Systems Engineer',
                 'Data Analyst',
                 'Cloud & DevOps Engineer',
                 'Python Developer',
