@@ -6,6 +6,20 @@
 
 ---
 
+## 🏗️ Production Architecture & Cloud Stack
+
+| Layer | Technology | Hosting / Cloud Provider |
+| :--- | :--- | :--- |
+| **Frontend** | **React.js** (React 19, Create React App, Bootstrap 5.3) | **Vercel** (`https://resume-scanner-ten-rho.vercel.app`) |
+| **Backend** | **FastAPI** (Python 3.11, Uvicorn, Gunicorn) | **Render** (`https://resume-analyzer-api.onrender.com`) |
+| **Database** | **Firebase Cloud Firestore** (NoSQL Document Store) | **Google Firebase** (`resume-scanner-ed200`) |
+| **Authentication** | **Firebase Authentication** & Bearer Token Sessions | **Google Firebase** |
+| **File Storage** | **Firebase Cloud Storage** (V4 Signed Resume & Report URLs) | **Google Firebase** (`resume-scanner-ed200.firebasestorage.app`) |
+| **AI Analysis** | **Gemini API** (`gemini-2.5-flash`) | **Google AI Studio** |
+| **Version Control** | **Git & GitHub** (`theakashsp/Resume-scanner-`) | **GitHub** |
+
+---
+
 ## Core Features
 
 | Feature | Description |
@@ -111,38 +125,40 @@ Everything this project is built with — languages, libraries, APIs, and toolin
 ## System Architecture
 
 ```text
-[ User ]
-   │
-   ▼  Upload PDF resume
+[ User / Browser Client ]
+         │
+         ▼  HTTPS
 ┌────────────────────────────────────────────────────────┐
-│                   React Frontend                       │
-│  Resume Analyzer UI · Dashboard · PDF Export · Auth    │
+│             Frontend: React.js (Hosted on Vercel)      │
+│   Resume Analyzer UI · Dashboard · PDF Export · Auth   │
 └───────────────────────────▲────────────────────────────┘
-                            │
+                            │  HTTPS REST API
                             ▼
 ┌────────────────────────────────────────────────────────┐
-│                   FastAPI Backend                      │
-│  PDF Parser · ML Matcher · Skills NLP · Auth Engine    │
+│             Backend: FastAPI (Hosted on Render)        │
+│   PDF Parser · ML Matcher · Skills NLP · Auth Engine   │
 └──────────────┬──────────────────────────┬──────────────┘
                │                          │
        ┌───────┴────────┐         ┌───────┴────────┐
        ▼                ▼         ▼                ▼
-  Google Gemini     JSearch/Adzuna  Cloud Firestore  Firebase Storage
- (AI analysis)     (Live India jobs) (Users & Apps)  (Resumes & Reports)
+   Gemini API     Live Job Portals Cloud Firestore  Firebase Storage
+  (AI Analysis)  (Verified India) (Users & Apps)   (Resumes & Reports)
 ```
 
 ---
 
-## Tech Stack (summary)
+## Tech Stack (Summary)
 
-| Layer | Technologies |
-| --- | --- |
-| **Frontend** | React 19, Axios, jsPDF, lucide-react, react-dropzone, Bootstrap 5, Google Fonts |
-| **Backend** | Python, FastAPI, Uvicorn, Pydantic, Requests, python-dotenv, scikit-learn |
-| **Database & Storage** | Google Firebase (Cloud Firestore & Firebase Cloud Storage) + Local Fallback |
-| **PDF Parsing** | pdfminer.six, pypdf |
-| **AI** | Google Gemini 2.5 Flash (`google-genai`) with retries + local fallback |
-| **Jobs** | JSearch via RapidAPI, Adzuna India API |
+| Component | Technology | Provider / Hosting |
+| :--- | :--- | :--- |
+| **Frontend** | React 19, Axios, jsPDF, Lucide Icons, Dropzone | **Vercel** (`https://resume-scanner-ten-rho.vercel.app`) |
+| **Backend** | Python 3.11, FastAPI, Uvicorn, Gunicorn, Scikit-learn | **Render** (`https://resume-analyzer-api.onrender.com`) |
+| **Database** | Firebase Cloud Firestore | **Google Firebase** (`resume-scanner-ed200`) |
+| **Authentication** | Firebase Authentication & Secure Bearer Sessions | **Google Firebase** |
+| **File Storage** | Firebase Cloud Storage | **Google Firebase** (`resume-scanner-ed200.firebasestorage.app`) |
+| **AI Analysis** | Google Gemini API (`gemini-2.5-flash`) | **Google AI Studio** |
+| **Version Control** | Git & GitHub | **GitHub** (`theakashsp/Resume-scanner-`) |
+| **Jobs Intelligence** | Direct Official Portals, JobsForce India, JSearch | Verified Live Opportunities |
 
 ---
 
