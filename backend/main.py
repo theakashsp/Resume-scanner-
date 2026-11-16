@@ -1197,44 +1197,66 @@ def fetch_jsearch_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[d
         return []
     query = f"{role_category} in India"
     out: list[dict[str, Any]] = []
-    try:
-        r = requests.get(
-            "https://jsearch.p.rapidapi.com/search",
-            headers={
-                "X-RapidAPI-Key": RAPIDAPI_KEY,
-                "X-RapidAPI-Host": RAPIDAPI_HOST,
-            },
-            params={
-                "query": query,
-                "page": "1",
-                "num_pages": "1",
-                "country": "in",
-            },
-            timeout=(5, 15),
-        )
-        if r.status_code == 429:
-            _log(f"[JSearch] Rate limit exceeded (429) for '{role_category}'")
-            return []
-        r.raise_for_status()
-        seen_keys: set[str] = set()
-        for j in (r.json().get("data") or []):
-            if len(out) >= limit:
-                break
-            apply_link = (j.get("job_apply_link") or j.get("job_google_link") or "").strip()
-            if not apply_link or not (apply_link.startswith("http://") or apply_link.startswith("https://")):
-                continue
-            comp = (j.get("employer_name") or "Hiring Company").strip()
-            title = (j.get("job_title") or role_category).strip()
-            dedup_key = f"{comp.lower()}::{title.lower()}"
-            if dedup_key in seen_keys:
-                continue
-            seen_keys.add(dedup_key)
 
-            city = j.get("job_city") or ""
-            country = j.get("job_country") or "India"
-            loc = ", ".join(x for x in [city, country] if x) or "India"
-            out.append(
-                _job_record(
+    # JSearch on RapidAPI uses /search-v2 (with fallback to /search)
+    endpoints = [
+        "https://jsearch.p.rapidapi.com/search-v2",
+        "https://jsearch.p.rapidapi.com/search",
+    ]
+    for url in endpoints:
+        try:
+            r = requests.get(
+                url,
+                headers={
+                    "X-RapidAPI-Key": RAPIDAPI_KEY,
+                    "X-RapidAPI-Host": RAPIDAPI_HOST,
+                },
+                params={
+                    "query": query,
+                    "country": "in",
+                    "num_pages": "1",
+                },
+                timeout=(5, 15),
+            )
+            if r.status_code == 429:
+                _log(f"[JSearch] Rate limit exceeded (429) for '{role_category}'")
+                return []
+            if r.status_code == 404:
+                continue
+            r.raise_for_status()
+            res_json = r.json()
+            raw_data = res_json.get("data")
+            raw_jobs: list[dict[str, Any]] = []
+            if isinstance(raw_data, dict):
+                raw_jobs = raw_data.get("jobs") or []
+            elif isinstance(raw_data, list):
+                raw_jobs = raw_data
+
+            seen_keys: set[str] = set()
+            for j in raw_jobs:
+                if len(out) >= limit:
+                    break
+                apply_link = (j.get("job_apply_link") or j.get("job_google_link") or "").strip()
+                if not apply_link or not (apply_link.startswith("http://") or apply_link.startswith("https://")):
+                    continue
+                comp = (j.get("employer_name") or "Hiring Company").strip()
+                title = (j.get("job_title") or role_category).strip()
+                dedup_key = f"{comp.lower()}::{title.lower()}"
+                if dedup_key in seen_keys:
+                    continue
+                seen_keys.add(dedup_key)
+
+                city = j.get("job_city") or ""
+                country = j.get("job_country") or "India"
+                if country == "IN":
+                    country = "India"
+                loc = ", ".join(x for x in [city, country] if x) or "India"
+
+                salary_str = j.get("job_salary") or j.get("job_salary_string")
+                if not salary_str and j.get("job_min_salary") and j.get("job_max_salary"):
+                    salary_str = f"₹{j['job_min_salary']:,} - ₹{j['job_max_salary']:,}"
+
+                rec = _job_record(
                     role_category=role_category,
                     company_name=comp,
                     job_title=title,
@@ -1242,11 +1264,18 @@ def fetch_jsearch_jobs(role_category: str, limit: int = JOBS_PER_ROLE) -> list[d
                     redirect_url=apply_link,
                     employment_type=j.get("job_employment_type") or "Full-time",
                 )
-            )
-    except requests.exceptions.Timeout:
-        _log(f"[JSearch] Request timed out for role: {role_category}")
-    except Exception as exc:
-        _log(f"[JSearch] {type(exc).__name__}: {exc!r}")
+                if salary_str:
+                    rec["salary_range"] = salary_str
+                rec["portal"] = "JSearch (Live)"
+                out.append(rec)
+
+            if out:
+                return out[:limit]
+        except requests.exceptions.Timeout:
+            _log(f"[JSearch] Request timed out for role: {role_category}")
+        except Exception as exc:
+            _log(f"[JSearch] {type(exc).__name__}: {exc!r}")
+
     return out[:limit]
 
 
@@ -1309,17 +1338,31 @@ def fetch_india_jobs_for_role(role_category: str, limit: int = JOBS_PER_ROLE) ->
     seen: set[str] = set()
     merged: list[dict[str, Any]] = []
 
-    tasks = [fetch_jobsforceindia_jobs]
+    # Priority 1: JSearch API via RapidAPI when key is configured
     if _is_real_key(RAPIDAPI_KEY):
-        tasks.append(fetch_jsearch_jobs)
+        try:
+            jsearch_res = fetch_jsearch_jobs(role_category, limit)
+            for job in jsearch_res:
+                url = job.get("redirect_url") or ""
+                if url in seen or url == "#":
+                    continue
+                seen.add(url)
+                merged.append(job)
+            if len(merged) >= limit:
+                return merged[:limit]
+        except Exception as exc:
+            _log(f"[fetch_jobs] JSearch primary fetch error: {exc!r}")
+
+    # Fallback to other providers if needed
+    tasks = [fetch_jobsforceindia_jobs]
     if _is_real_key(JOBVETTA_API_KEY):
         tasks.append(fetch_jobvetta_jobs)
     if _is_real_key(ADZUNA_APP_ID) and _is_real_key(ADZUNA_APP_KEY):
         tasks.append(fetch_adzuna_jobs)
 
-    if tasks:
+    if tasks and len(merged) < limit:
         with ThreadPoolExecutor(max_workers=min(len(tasks), 4)) as pool:
-            futures = [pool.submit(fn, role_category, limit) for fn in tasks]
+            futures = [pool.submit(fn, role_category, limit - len(merged)) for fn in tasks]
             for future in as_completed(futures):
                 try:
                     for job in future.result():
@@ -1331,7 +1374,7 @@ def fetch_india_jobs_for_role(role_category: str, limit: int = JOBS_PER_ROLE) ->
                         if len(merged) >= limit:
                             return merged[:limit]
                 except Exception as exc:
-                    _log(f"[fetch_jobs] provider execution error: {type(exc).__name__}: {exc!r}")
+                    _log(f"[fetch_jobs] fallback provider execution error: {type(exc).__name__}: {exc!r}")
 
     # If live APIs didn't return enough jobs (e.g. specialized hardware / VLSI engineering),
     # complement with verified top employer direct openings (NVIDIA, Intel, Qualcomm, Microsoft, Google, etc.)

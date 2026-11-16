@@ -91,7 +91,7 @@ function BrandName({ variant = 'header' }) {
   );
 }
 
-function Navbar({ scrolled, user, onOpenAuth, onLogout, onGoHome, onOpenApplications, appliedCount = 0 }) {
+function Navbar({ scrolled, user, onOpenAuth, onLogout, onGoHome, onOpenApplications, appliedCount = 0, hasResults = false }) {
   const scrollTo = (id) => {
     onGoHome?.();
     setTimeout(() => {
@@ -111,7 +111,9 @@ function Navbar({ scrolled, user, onOpenAuth, onLogout, onGoHome, onOpenApplicat
           <a href="#services" onClick={(e) => { e.preventDefault(); scrollTo('services'); }}>Services</a>
           <a href="#upload" onClick={(e) => { e.preventDefault(); scrollTo('upload'); }}>Analyze</a>
           <a href="#process" onClick={(e) => { e.preventDefault(); scrollTo('process'); }}>Process</a>
-          <a href="#listings" onClick={(e) => { e.preventDefault(); scrollTo('listings'); }}>Listings</a>
+          {hasResults && (
+            <a href="#listings" onClick={(e) => { e.preventDefault(); scrollTo('listings'); }}>Recommended Jobs</a>
+          )}
         </div>
         <div className="tw-navbar__actions">
           <button
@@ -344,7 +346,7 @@ function AtsScoreRing({ score }) {
   );
 }
 
-function Footer() {
+function Footer({ hasResults = false }) {
   const scrollTo = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -363,7 +365,9 @@ function Footer() {
               <li><a href="#home" onClick={(e) => { e.preventDefault(); scrollTo('home'); }}>Home</a></li>
               <li><a href="#services" onClick={(e) => { e.preventDefault(); scrollTo('services'); }}>Services</a></li>
               <li><a href="#upload" onClick={(e) => { e.preventDefault(); scrollTo('upload'); }}>Analyze</a></li>
-              <li><a href="#listings" onClick={(e) => { e.preventDefault(); scrollTo('listings'); }}>Listings</a></li>
+              {hasResults && (
+                <li><a href="#listings" onClick={(e) => { e.preventDefault(); scrollTo('listings'); }}>Recommended Jobs</a></li>
+              )}
             </ul>
           </div>
           <div className="col-6 col-lg-4">
@@ -483,19 +487,21 @@ function App() {
   const [authPage, setAuthPage] = useState(null);
   const [authUser, setAuthUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
-  const [exploreJobsData, setExploreJobsData] = useState(null);
-  const [selectedExploreRole, setSelectedExploreRole] = useState('Full Stack Developer');
-  const [exploreLoading, setExploreLoading] = useState(false);
-  const [showApplicationsModal, setShowApplicationsModal] = useState(false);
   const [appliedJobsCount, setAppliedJobsCount] = useState(0);
   const [appliedJobsMap, setAppliedJobsMap] = useState({});
 
-  const refreshAppliedJobs = useCallback(() => {
+  const refreshAppliedJobs = useCallback((overrideEmail) => {
     const userEmail =
+      (typeof overrideEmail === 'string' && overrideEmail) ||
       authUser?.email ||
       results?.candidate_email ||
       results?.candidate_metadata?.candidate_email ||
       '';
+    if (!userEmail) {
+      setAppliedJobsCount(0);
+      setAppliedJobsMap({});
+      return;
+    }
     apiService.getAppliedJobs(userEmail)
       .then((res) => {
         if (res?.applied_keys && Array.isArray(res.applied_keys)) {
@@ -512,10 +518,22 @@ function App() {
           setAppliedJobsMap({});
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setAppliedJobsCount(0);
+        setAppliedJobsMap({});
+      });
   }, [authUser?.email, results?.candidate_email, results?.candidate_metadata?.candidate_email]);
 
   const refreshAppliedCount = refreshAppliedJobs;
+
+  useEffect(() => {
+    if (authUser?.email) {
+      refreshAppliedJobs(authUser.email);
+    } else {
+      setAppliedJobsCount(0);
+      setAppliedJobsMap({});
+    }
+  }, [authUser?.email, refreshAppliedJobs]);
 
   const timelineStep = useMemo(() => {
     if (results) return 3;
@@ -561,15 +579,6 @@ function App() {
   }, [refreshAppliedJobs]);
 
   useEffect(() => {
-    setExploreLoading(true);
-    apiService
-      .exploreJobs(selectedExploreRole)
-      .then((data) => setExploreJobsData(data))
-      .catch(() => {})
-      .finally(() => setExploreLoading(false));
-  }, [selectedExploreRole]);
-
-  useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -593,16 +602,17 @@ function App() {
     setAuthUser(user);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, user }));
     setAuthPage(null);
+
+    // Reset previous resume analysis and old user state so the new account starts completely fresh
+    setResults(null);
+    setFile(null);
+    setError(null);
+    setAppliedJobsCount(0);
+    setAppliedJobsMap({});
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (user?.email) {
-      apiService.getAppliedJobs(user.email)
-        .then((res) => {
-          if (res?.applied_keys && Array.isArray(res.applied_keys)) {
-            setAppliedJobsCount(res.applied_keys.length);
-            if (res.applications_map) setAppliedJobsMap(res.applications_map);
-          }
-        })
-        .catch(() => {});
+      refreshAppliedJobs(user.email);
     }
   };
 
@@ -619,6 +629,9 @@ function App() {
     setAuthUser(null);
     setAppliedJobsCount(0);
     setAppliedJobsMap({});
+    setResults(null);
+    setFile(null);
+    setError(null);
   };
   const handleAnalyze = async () => {
     if (!file) return;
@@ -665,15 +678,15 @@ function App() {
 
   const candidateProfile = useMemo(() => {
     return {
-      name: candidateName !== 'Not found' ? candidateName : (authUser?.name || ''),
-      email: candidateEmail !== 'Not found' ? candidateEmail : (authUser?.email || ''),
-      phone: candidatePhone !== 'Not found' ? candidatePhone : (authUser?.phone || ''),
+      name: authUser?.name || (candidateName !== 'Not found' ? candidateName : ''),
+      email: authUser?.email || (candidateEmail !== 'Not found' ? candidateEmail : ''),
+      phone: authUser?.phone || (candidatePhone !== 'Not found' ? candidatePhone : ''),
       college: candidateCollege !== 'Not found' ? candidateCollege : '',
       matchedSkills: matched,
-      predictedRole: role || selectedExploreRole,
+      predictedRole: role || 'Software Developer',
       atsScore: results?.ats_score ?? 85,
     };
-  }, [candidateName, candidateEmail, candidatePhone, candidateCollege, matched, role, selectedExploreRole, authUser, results]);
+  }, [candidateName, candidateEmail, candidatePhone, candidateCollege, matched, role, authUser, results]);
 
   const generatePDFReport = () => {
     if (!results) return;
@@ -703,6 +716,7 @@ function App() {
       <Navbar
         scrolled={scrolled}
         user={authUser}
+        hasResults={Boolean(results)}
         onOpenAuth={(mode) => setAuthPage(mode)}
         onLogout={handleLogout}
         onGoHome={() => setAuthPage(null)}
@@ -874,57 +888,14 @@ function App() {
         </section>
       )}
 
-      {!results && (
-        <section className="tw-section tw-section--alt" id="listings">
-          <div className="container">
-            <div className="d-flex flex-wrap justify-content-center gap-2 mb-4">
-              {[
-                'Full Stack Developer',
-                'VLSI / RTL Design Engineer',
-                'Embedded Systems Engineer',
-                'Data Analyst',
-                'Cloud & DevOps Engineer',
-                'Python Developer',
-                'React Developer',
-                'AI/ML Engineer',
-                'UI/UX Designer',
-                'Financial Analyst',
-              ].map((roleName) => (
-                <button
-                  key={roleName}
-                  type="button"
-                  className={`btn btn-sm ${selectedExploreRole === roleName ? 'btn-primary tw-btn-primary' : 'btn-outline-secondary'}`}
-                  onClick={() => setSelectedExploreRole(roleName)}
-                >
-                  {roleName}
-                </button>
-              ))}
-            </div>
-            <LiveJobOpenings
-              recommendedRoles={exploreJobsData?.roles || [selectedExploreRole]}
-              jobsByRole={exploreJobsData?.jobs_by_role || {}}
-              jobsMessage={exploreJobsData?.jobs_message}
-              jobsCount={exploreJobsData?.jobs_count || 0}
-              loading={exploreLoading}
-              title={`Live Openings for ${selectedExploreRole}`}
-              subtitle="Browse real-time openings in India across top tech companies, startups & enterprises"
-              candidateProfile={candidateProfile}
-              appliedJobsMap={appliedJobsMap}
-              onApplySuccess={refreshAppliedJobs}
-              onOpenApplications={() => setShowApplicationsModal(true)}
-            />
-          </div>
-        </section>
-      )}
-
-      <Footer />
+      <Footer hasResults={Boolean(results)} />
         </>
       )}
 
       <ApplicationsModal
         isOpen={showApplicationsModal}
         onClose={() => setShowApplicationsModal(false)}
-        candidateEmail={candidateEmail !== 'Not found' ? candidateEmail : (authUser?.email || '')}
+        candidateEmail={authUser?.email || (candidateEmail !== 'Not found' ? candidateEmail : '')}
         onApplicationUpdated={refreshAppliedCount}
       />
     </div>
