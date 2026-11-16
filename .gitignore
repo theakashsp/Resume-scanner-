@@ -9,7 +9,10 @@ frontend/.env*
 *serviceAccountKey*.json
 *firebase-adminsdk*.json
 *credentials*.json
+*secret*.json
 *.pem
+*.key
+*.token
 backend/venv/
 backend/uploads/
 backend/platform_stats.json
