@@ -70,6 +70,12 @@ export function formatApiError(err) {
     if (err.response.status === 413) return 'The uploaded file is too large. Please upload a smaller PDF (under 10MB).';
     if (err.response.status === 401) return 'Your session has expired. Please sign in again.';
     if (err.response.status === 429) return 'Rate limit exceeded. Please wait a moment before trying again.';
+    if (err.response.status === 403 || err.response.status === 502) {
+      return 'The backend service on Render is starting up or not yet created. Please verify your Render web service (https://dashboard.render.com) is active.';
+    }
+    if (err.response.status === 404) {
+      return 'API endpoint not found. Please verify your backend server on Render is active.';
+    }
     return `Request failed with status code ${err.response.status}.`;
   }
 
