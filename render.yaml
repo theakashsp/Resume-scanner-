@@ -37,10 +37,10 @@ services:
       - key: CORS_ORIGIN_REGEX
         value: "^https:\\/\\/.*\\.vercel\\.app$|^https:\\/\\/.*\\.netlify\\.app$|^https:\\/\\/.*\\.onrender\\.com$"
       - key: FIREBASE_PROJECT_ID
-        sync: false
-      - key: FIREBASE_CREDENTIALS_JSON
-        sync: false
+        value: resume-scanner-ed200
       - key: FIREBASE_STORAGE_BUCKET
+        value: resume-scanner-ed200.firebasestorage.app
+      - key: FIREBASE_CREDENTIALS_JSON
         sync: false
 
   # ----------------------------------------------------------------------------
