@@ -487,6 +487,7 @@ function App() {
   const [authPage, setAuthPage] = useState(null);
   const [authUser, setAuthUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
+  const [showApplicationsModal, setShowApplicationsModal] = useState(false);
   const [appliedJobsCount, setAppliedJobsCount] = useState(0);
   const [appliedJobsMap, setAppliedJobsMap] = useState({});
 
